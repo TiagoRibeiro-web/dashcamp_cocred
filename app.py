@@ -1,15 +1,19 @@
 import streamlit as st
 import pandas as pd
+import openpyxl
 
-st.set_page_config(page_title="Dashboard de Campanhas", layout="wide")
+st.set_page_config(page_title="Dashboard de Campanhas - SICOOB COCRED", layout="wide")
 
-# ---------------------------
-# Carregar dados
-# ---------------------------
+# =========================================================
+# CARREGAMENTO E TRATAMENTO DOS DADOS
+# =========================================================
 @st.cache_data
 def carregar_dados():
-    df = pd.read_excel("jobs.xlsx")
+    df = pd.read_excel("jobs.xlsx", engine='openpyxl')
 
+    # -------------------------
+    # Tratamento do prazo
+    # -------------------------
     if "Prazo em dias" in df.columns:
         df["Prazo em dias"] = (
             df["Prazo em dias"]
@@ -26,19 +30,35 @@ def carregar_dados():
 
         # Converter números
         df["Prazo em dias"] = pd.to_numeric(
-            df["Prazo em dias"],
-            errors="coerce"
+            df["Prazo em dias"], errors="coerce"
         )
 
-    # Semáforo
-    def classificar_semaforo(row):
+    # -------------------------
+    # Faixa de prazo (checkbox)
+    # -------------------------
+    def classificar_faixa(row):
         if row["Situação do Prazo"] == "Prazo encerrado":
-            return "Atrasado"
+            return "Prazo encerrado"
         if pd.isna(row["Prazo em dias"]):
-            return "No prazo"
+            return "Sem prazo"
         if row["Prazo em dias"] <= 0:
-            return "Atrasado"
+            return "Prazo encerrado"
         elif row["Prazo em dias"] <= 5:
+            return "1 a 5 dias"
+        elif row["Prazo em dias"] <= 10:
+            return "6 a 10 dias"
+        else:
+            return "Acima de 10 dias"
+
+    df["Faixa de Prazo"] = df.apply(classificar_faixa, axis=1)
+
+    # -------------------------
+    # Semáforo
+    # -------------------------
+    def classificar_semaforo(row):
+        if row["Faixa de Prazo"] == "Prazo encerrado":
+            return "Atrasado"
+        elif row["Faixa de Prazo"] == "1 a 5 dias":
             return "Atenção"
         else:
             return "No prazo"
@@ -51,75 +71,65 @@ def carregar_dados():
 df = carregar_dados()
 df = df.dropna(subset=["Campanha ou Ação", "Status Operacional"])
 
-st.title("📊 Dashboard de Campanhas - SICOOB COCRED")
+# =========================================================
+# TÍTULO
+# =========================================================
+st.title("📊 Dashboard de Campanhas – SICOOB COCRED")
 
-# ---------------------------
-# LEGENDA DO SEMÁFORO
-# ---------------------------
-with st.expander("Legenda do Semáforo de Prazo"):
+# =========================================================
+# LEGENDA
+# =========================================================
+with st.expander("📌 Legendas e critérios"):
     st.markdown("""
-    **Classificação automática dos prazos:**
+**Semáforo de Prazo**
+- 🟢 **No prazo:** mais de 5 dias
+- 🟡 **Atenção:** 1 a 5 dias
+- 🔴 **Atrasado:** prazo encerrado ou vencido
 
-    - 🟢 **No prazo:** mais de 5 dias restantes
-    - 🟡 **Atenção:** entre 1 e 5 dias restantes
-    - 🔴 **Atrasado:** prazo encerrado ou vencido
-    """)
-
-# ---------------------------
-# FILTROS NA SIDEBAR
-# ---------------------------
-st.sidebar.header("Filtros")
-
-st.sidebar.markdown("""
-**Como usar os filtros:**
-- Desmarque as opções que não deseja visualizar.
-- Os dados do dashboard serão atualizados automaticamente.
+**Faixas de Prazo**
+- Prazo encerrado
+- 1 a 5 dias
+- 6 a 10 dias
+- Acima de 10 dias
 """)
+
+# =========================================================
+# FILTROS (SIDEBAR)
+# =========================================================
+st.sidebar.header("Filtros")
+st.sidebar.caption("Os dados são atualizados automaticamente conforme o Excel.")
 
 df_filtrado = df.copy()
 
-# Situação do prazo
-if "Situação do Prazo" in df.columns:
-    situacoes = sorted(df["Situação do Prazo"].unique())
-    situacao_sel = []
+# -------------------------
+# Filtro por faixa de prazo
+# -------------------------
+st.sidebar.subheader("Prazo")
+st.sidebar.caption("Filtra jobs por faixa de prazo.")
 
-    st.sidebar.subheader("Situação do Prazo")
-    st.sidebar.caption("Filtra jobs por prazo ativo ou encerrado.")
+faixas_ordem = [
+    "Prazo encerrado",
+    "1 a 5 dias",
+    "6 a 10 dias",
+    "Acima de 10 dias"
+]
 
-    for s in situacoes:
-        marcado = st.sidebar.checkbox(s, value=True, key=f"prazo_{s}")
-        if marcado:
-            situacao_sel.append(s)
+faixas_disponiveis = df["Faixa de Prazo"].unique()
+faixas_sel = []
 
-    df_filtrado = df_filtrado[
-        df_filtrado["Situação do Prazo"].isin(situacao_sel)
-    ]
-
-# Prazo numérico
-df_prazo = df_filtrado.dropna(subset=["Prazo em dias"])
-if not df_prazo.empty:
-    prazo_min = int(df_prazo["Prazo em dias"].min())
-    prazo_max = int(df_prazo["Prazo em dias"].max())
-
-    st.sidebar.subheader("Prazo em dias")
-    st.sidebar.caption("Filtra jobs pelo número de dias restantes.")
-
-    prazo_sel = st.sidebar.slider(
-        "Intervalo de prazo",
-        prazo_min,
-        prazo_max,
-        (prazo_min, prazo_max)
-    )
-
-    df_filtrado = df_filtrado[
-        (df_filtrado["Prazo em dias"].isna()) |
-        (
-            (df_filtrado["Prazo em dias"] >= prazo_sel[0]) &
-            (df_filtrado["Prazo em dias"] <= prazo_sel[1])
+for faixa in faixas_ordem:
+    if faixa in faixas_disponiveis:
+        marcado = st.sidebar.checkbox(
+            faixa, value=True, key=f"faixa_{faixa}"
         )
-    ]
+        if marcado:
+            faixas_sel.append(faixa)
 
-# Função de filtro checkbox
+df_filtrado = df_filtrado[df_filtrado["Faixa de Prazo"].isin(faixas_sel)]
+
+# -------------------------
+# Função genérica checkbox
+# -------------------------
 def filtro_checkbox(coluna, titulo, legenda):
     valores = sorted(df[coluna].dropna().unique())
     selecionados = []
@@ -129,9 +139,7 @@ def filtro_checkbox(coluna, titulo, legenda):
 
     for valor in valores:
         marcado = st.sidebar.checkbox(
-            str(valor),
-            value=True,
-            key=f"{coluna}_{valor}"
+            str(valor), value=True, key=f"{coluna}_{valor}"
         )
         if marcado:
             selecionados.append(valor)
@@ -142,54 +150,41 @@ def filtro_checkbox(coluna, titulo, legenda):
 # Prioridade
 if "Prioridade" in df.columns:
     prioridade_sel = filtro_checkbox(
-        "Prioridade",
-        "Prioridade",
-        "Filtra jobs por nível de urgência."
+        "Prioridade", "Prioridade", "Nível de urgência do job."
     )
-    df_filtrado = df_filtrado[
-        df_filtrado["Prioridade"].isin(prioridade_sel)
-    ]
+    df_filtrado = df_filtrado[df_filtrado["Prioridade"].isin(prioridade_sel)]
 
 # Produção
 if "Produção" in df.columns:
     producao_sel = filtro_checkbox(
-        "Produção",
-        "Produção",
-        "Filtra por tipo de produção ou canal."
+        "Produção", "Produção", "Tipo ou canal de produção."
     )
-    df_filtrado = df_filtrado[
-        df_filtrado["Produção"].isin(producao_sel)
-    ]
+    df_filtrado = df_filtrado[df_filtrado["Produção"].isin(producao_sel)]
 
 # Status
 status_sel = filtro_checkbox(
-    "Status Operacional",
-    "Status",
-    "Filtra pelo status atual do job."
+    "Status Operacional", "Status", "Status atual do job."
 )
-df_filtrado = df_filtrado[
-    df_filtrado["Status Operacional"].isin(status_sel)
-]
+df_filtrado = df_filtrado[df_filtrado["Status Operacional"].isin(status_sel)]
 
-# ---------------------------
+# =========================================================
 # ALERTA DE ATRASO
-# ---------------------------
+# =========================================================
 atrasados = df_filtrado[df_filtrado["Semáforo"] == "Atrasado"]
-
 if len(atrasados) > 0:
-    st.error(f"⚠️ {len(atrasados)} job(s) em atraso.")
+    st.error(f"⚠️ {len(atrasados)} job(s) com prazo encerrado.")
 
-# ---------------------------
-# RESUMO GERAL (CARDS COLORIDOS)
-# ---------------------------
+# =========================================================
+# RESUMO GERAL (CARDS)
+# =========================================================
 st.subheader("Resumo Geral")
-st.caption("Quantidade total de jobs por status operacional.")
+st.caption("Total de jobs por status operacional.")
 
+# Cores que funcionam em light/dark mode
 cores_status = {
-    "Aprovado": "#00A859",
-    "Em Produção": "#007A3D",
-    "Aguardando": "#7ED957",
-    "Reprovado": "#4B5563",
+    "Aprovado": "#00A859",        # Verde SICOOB
+    "Em Produção": "#007A3D",     # Verde escuro
+    "Aguardando": "#7ED957",      # Verde claro
 }
 
 def cor_status(nome):
@@ -200,7 +195,7 @@ def cor_status(nome):
         return cores_status["Em Produção"]
     if "aguardando" in nome:
         return cores_status["Aguardando"]
-    return "#4B5563"
+    return "#6B7280"
 
 resumo_geral = (
     df_filtrado["Status Operacional"]
@@ -209,38 +204,33 @@ resumo_geral = (
 )
 resumo_geral.columns = ["Status", "Quantidade"]
 
-if not resumo_geral.empty:
-    cols = st.columns(len(resumo_geral))
-    for idx, row in resumo_geral.iterrows():
-        cor = cor_status(row["Status"])
-        cols[idx].markdown(
-            f"""
-            <div style="
-                background:{cor};
-                padding:20px;
-                border-radius:12px;
-                text-align:center;
-                color:white;
-                font-weight:bold;
-            ">
-                <div style="font-size:18px;">
-                    {row['Status']}
-                </div>
-                <div style="font-size:36px;">
-                    {int(row['Quantidade'])}
-                </div>
-            </div>
-            """,
-            unsafe_allow_html=True
-        )
+cols = st.columns(len(resumo_geral))
+for i, row in resumo_geral.iterrows():
+    cor = cor_status(row["Status"])
+    cols[i].markdown(
+        f"""
+        <div style="
+            background:{cor};
+            padding:20px;
+            border-radius:12px;
+            text-align:center;
+            color:white;
+            font-weight:bold;
+        ">
+            <div style="font-size:16px;">{row['Status']}</div>
+            <div style="font-size:34px;">{int(row['Quantidade'])}</div>
+        </div>
+        """,
+        unsafe_allow_html=True
+    )
 
 st.divider()
 
-# ---------------------------
-# TABELA RESUMO POR CAMPANHA
-# ---------------------------
+# =========================================================
+# RESUMO POR CAMPANHA (ESTILO EXCEL)
+# =========================================================
 st.subheader("Resumo por Campanha")
-st.caption("Visão consolidada dos status dentro de cada campanha.")
+st.caption("Campanhas com atraso aparecem no topo.")
 
 tabela_resumo = pd.pivot_table(
     df_filtrado,
@@ -259,41 +249,140 @@ campanhas_atrasadas = (
 )
 
 tabela_resumo["Atrasada"] = tabela_resumo.index.isin(campanhas_atrasadas)
-
 tabela_resumo = tabela_resumo.sort_values(
     by=["Atrasada", "Total"],
     ascending=[False, False]
-)
+).reset_index()
 
-tabela_resumo = tabela_resumo.reset_index()
-
-def destacar_campanhas(row):
+# CORREÇÃO: Cores que funcionam em light/dark mode
+def destacar_campanha(row):
     if row["Atrasada"]:
-        return ["background-color: #fecaca"] * len(row)
+        # Vermelho claro no light, vermelho escuro no dark
+        return ["background-color: rgba(254, 202, 202, 0.3)"] * len(row)
     return [""] * len(row)
 
 st.dataframe(
-    tabela_resumo.style.apply(destacar_campanhas, axis=1),
+    tabela_resumo.style.apply(destacar_campanha, axis=1),
     use_container_width=True
 )
 
 st.divider()
 
-# ---------------------------
-# TABELA DETALHADA
-# ---------------------------
+# =========================================================
+# TABELA DETALHADA - CORRIGIDA PARA LIGHT/DARK
+# =========================================================
 st.subheader("Detalhamento dos Jobs")
-st.caption("Lista completa dos jobs conforme filtros aplicados.")
+st.caption("Dados completos conforme filtros aplicados.")
 
+# Função com cores adaptativas para light/dark mode
 def destacar_semaforo(row):
+    # Usar transparência para funcionar em ambos os modos
     if row["Semáforo"] == "Atrasado":
-        return ["background-color: #fecaca"] * len(row)
+        # Vermelho com transparência
+        return ["background-color: rgba(254, 202, 202, 0.3)"] * len(row)
     elif row["Semáforo"] == "Atenção":
-        return ["background-color: #dcfce7"] * len(row)
-    else:
-        return [""] * len(row)
+        # Amarelo com transparência
+        return ["background-color: rgba(255, 243, 205, 0.5)"] * len(row)
+    elif row["Semáforo"] == "No prazo":
+        # Verde com transparência
+        return ["background-color: rgba(209, 231, 221, 0.4)"] * len(row)
+    return [""] * len(row)
 
+# Configurar o DataFrame com melhor formatação
+styled_df = df_filtrado.style.apply(destacar_semaforo, axis=1)
+
+# Adicionar formatação condicional para números
+if "Prazo em dias" in df_filtrado.columns:
+    styled_df = styled_df.format({
+        "Prazo em dias": "{:.0f}",
+    }, na_rep="N/A")
+
+# Configurações para melhor visualização
 st.dataframe(
-    df_filtrado.style.apply(destacar_semaforo, axis=1),
-    use_container_width=True
+    styled_df,
+    use_container_width=True,
+    height=600,  # Altura fixa com scroll
+    column_config={
+        "Prazo em dias": st.column_config.NumberColumn(
+            "Prazo (dias)",
+            help="Prazo em dias para conclusão",
+            format="%d"
+        ),
+        "Prioridade": st.column_config.TextColumn(
+            "Prioridade",
+            help="Nível de prioridade"
+        ),
+        "Status Operacional": st.column_config.TextColumn(
+            "Status",
+            help="Status operacional atual"
+        ),
+        "Semáforo": st.column_config.TextColumn(
+            "Situação",
+            help="Situação do prazo: Atrasado, Atenção ou No prazo"
+        )
+    },
+    hide_index=True  # Oculta o índice numérico
 )
+
+# =========================================================
+# ESTILO CSS ADAPTATIVO PARA LIGHT/DARK MODE
+# =========================================================
+st.markdown("""
+<style>
+    /* Estilos para a tabela que funcionam em light/dark mode */
+    .stDataFrame {
+        border: 1px solid var(--border-color);
+        border-radius: 8px;
+    }
+    
+    /* Garantir contraste de texto */
+    .stDataFrame [data-testid="stDataFrame"] {
+        color: var(--text-color) !important;
+    }
+    
+    /* Headers da tabela */
+    .stDataFrame th {
+        background-color: var(--background-color) !important;
+        color: var(--text-color) !important;
+        font-weight: bold !important;
+    }
+    
+    /* Células da tabela */
+    .stDataFrame td {
+        color: var(--text-color) !important;
+        border-color: var(--border-color) !important;
+    }
+    
+    /* Linhas alternadas (zebra striping) */
+    .stDataFrame tr:nth-child(even) {
+        background-color: rgba(0, 0, 0, 0.02) !important;
+    }
+    
+    /* Hover nas linhas */
+    .stDataFrame tr:hover {
+        background-color: rgba(0, 0, 0, 0.05) !important;
+    }
+</style>
+""", unsafe_allow_html=True)
+
+# =========================================================
+# BOTÃO PARA ALTERNAR VISUALIZAÇÃO (OPCIONAL)
+# =========================================================
+with st.expander("⚙️ Configurações de visualização"):
+    col1, col2 = st.columns(2)
+    
+    with col1:
+        if st.button("🔄 Atualizar dados"):
+            st.cache_data.clear()
+            st.rerun()
+    
+    with col2:
+        st.info("""
+        **Dicas:**
+        - Clique nos cabeçalhos para ordenar
+        - Use Ctrl+F para buscar na tabela
+        - Role para ver todas as colunas
+        """)
+    
+    # Estatísticas rápidas
+    st.caption(f"📊 Mostrando {len(df_filtrado)} de {len(df)} registros")
