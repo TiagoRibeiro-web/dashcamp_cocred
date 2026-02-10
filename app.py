@@ -1,15 +1,51 @@
 import streamlit as st
 import pandas as pd
-import openpyxl
+import os
 
 st.set_page_config(page_title="Dashboard de Campanhas - SICOOB COCRED", layout="wide")
+
+# =========================================================
+# VERIFICAÇÃO DO ARQUIVO
+# =========================================================
+@st.cache_data
+def verificar_arquivo():
+    if not os.path.exists("jobs.xlsx"):
+        st.error("❌ Arquivo 'jobs.xlsx' não encontrado no diretório do projeto!")
+        st.info("Certifique-se de que o arquivo jobs.xlsx está na mesma pasta do app.py")
+        return False
+    return True
 
 # =========================================================
 # CARREGAMENTO E TRATAMENTO DOS DADOS
 # =========================================================
 @st.cache_data
 def carregar_dados():
-    df = pd.read_excel("jobs.xlsx")
+    # Verifica se arquivo existe
+    if not os.path.exists("jobs.xlsx"):
+        st.error("Arquivo jobs.xlsx não encontrado!")
+        return pd.DataFrame()
+    
+    try:
+        # Usa engine explícita para evitar problemas de dependência
+        df = pd.read_excel("jobs.xlsx", engine='openpyxl')
+    except ImportError as e:
+        st.error("""
+        ⚠️ Erro de dependência: openpyxl não está instalado!
+        
+        **Solução:**
+        1. Crie um arquivo `requirements.txt` na raiz do projeto com:
+        ```
+        streamlit==1.54.0
+        pandas==2.3.3
+        openpyxl>=3.0.0
+        ```
+        2. Commit e push para o GitHub
+        3. O Streamlit Cloud reinstalará as dependências automaticamente
+        """)
+        return pd.DataFrame()
+    except Exception as e:
+        st.error(f"Erro ao ler o arquivo Excel: {str(e)}")
+        return pd.DataFrame()
 
     # -------------------------
     # Tratamento do prazo
@@ -24,7 +60,7 @@ def carregar_dados():
         # Situação do prazo
         df["Situação do Prazo"] = df["Prazo em dias"].apply(
             lambda x: "Prazo encerrado"
-            if "encerrado" in x.lower()
+            if "encerrado" in str(x).lower()
             else "Em prazo"
         )
 
@@ -68,7 +104,19 @@ def carregar_dados():
     return df
 
 
+# Verifica arquivo antes de continuar
+if not verificar_arquivo():
+    st.stop()
+
+# Carrega dados
 df = carregar_dados()
+
+# Verifica se dados foram carregados
+if df.empty:
+    st.warning("Nenhum dado foi carregado. Verifique o arquivo jobs.xlsx.")
+    st.stop()
+
+# Remove linhas sem informações essenciais
 df = df.dropna(subset=["Campanha ou Ação", "Status Operacional"])
 
 # =========================================================
@@ -125,7 +173,10 @@ for faixa in faixas_ordem:
         if marcado:
             faixas_sel.append(faixa)
 
-df_filtrado = df_filtrado[df_filtrado["Faixa de Prazo"].isin(faixas_sel)]
+if faixas_sel:
+    df_filtrado = df_filtrado[df_filtrado["Faixa de Prazo"].isin(faixas_sel)]
+else:
+    st.sidebar.warning("Selecione pelo menos uma faixa de prazo")
 
 # -------------------------
 # Função genérica checkbox
@@ -152,133 +203,193 @@ if "Prioridade" in df.columns:
     prioridade_sel = filtro_checkbox(
         "Prioridade", "Prioridade", "Nível de urgência do job."
     )
-    df_filtrado = df_filtrado[df_filtrado["Prioridade"].isin(prioridade_sel)]
+    if prioridade_sel:
+        df_filtrado = df_filtrado[df_filtrado["Prioridade"].isin(prioridade_sel)]
 
 # Produção
 if "Produção" in df.columns:
     producao_sel = filtro_checkbox(
         "Produção", "Produção", "Tipo ou canal de produção."
     )
-    df_filtrado = df_filtrado[df_filtrado["Produção"].isin(producao_sel)]
+    if producao_sel:
+        df_filtrado = df_filtrado[df_filtrado["Produção"].isin(producao_sel)]
 
 # Status
-status_sel = filtro_checkbox(
-    "Status Operacional", "Status", "Status atual do job."
-)
-df_filtrado = df_filtrado[df_filtrado["Status Operacional"].isin(status_sel)]
+if "Status Operacional" in df.columns:
+    status_sel = filtro_checkbox(
+        "Status Operacional", "Status", "Status atual do job."
+    )
+    if status_sel:
+        df_filtrado = df_filtrado[df_filtrado["Status Operacional"].isin(status_sel)]
 
 # =========================================================
 # ALERTA DE ATRASO
 # =========================================================
-atrasados = df_filtrado[df_filtrado["Semáforo"] == "Atrasado"]
-if len(atrasados) > 0:
-    st.error(f"⚠️ {len(atrasados)} job(s) com prazo encerrado.")
+if not df_filtrado.empty and "Semáforo" in df_filtrado.columns:
+    atrasados = df_filtrado[df_filtrado["Semáforo"] == "Atrasado"]
+    if len(atrasados) > 0:
+        st.error(f"⚠️ {len(atrasados)} job(s) com prazo encerrado.")
 
 # =========================================================
 # RESUMO GERAL (CARDS)
 # =========================================================
-st.subheader("Resumo Geral")
-st.caption("Total de jobs por status operacional.")
+if not df_filtrado.empty and "Status Operacional" in df_filtrado.columns:
+    st.subheader("Resumo Geral")
+    st.caption("Total de jobs por status operacional.")
 
-cores_status = {
-    "Aprovado": "#00A859",        # Verde SICOOB
-    "Em Produção": "#007A3D",     # Verde escuro
-    "Aguardando": "#7ED957",      # Verde claro
-}
+    cores_status = {
+        "Aprovado": "#00A859",        # Verde SICOOB
+        "Em Produção": "#007A3D",     # Verde escuro
+        "Aguardando": "#7ED957",      # Verde claro
+    }
 
-def cor_status(nome):
-    nome = nome.lower()
-    if "aprovado" in nome:
-        return cores_status["Aprovado"]
-    if "produção" in nome:
-        return cores_status["Em Produção"]
-    if "aguardando" in nome:
-        return cores_status["Aguardando"]
-    return "#6B7280"
+    def cor_status(nome):
+        nome = str(nome).lower()
+        if "aprovado" in nome:
+            return cores_status["Aprovado"]
+        if "produção" in nome:
+            return cores_status["Em Produção"]
+        if "aguardando" in nome:
+            return cores_status["Aguardando"]
+        return "#6B7280"
 
-resumo_geral = (
-    df_filtrado["Status Operacional"]
-    .value_counts()
-    .reset_index()
-)
-resumo_geral.columns = ["Status", "Quantidade"]
-
-cols = st.columns(len(resumo_geral))
-for i, row in resumo_geral.iterrows():
-    cor = cor_status(row["Status"])
-    cols[i].markdown(
-        f"""
-        <div style="
-            background:{cor};
-            padding:20px;
-            border-radius:12px;
-            text-align:center;
-            color:white;
-            font-weight:bold;
-        ">
-            <div style="font-size:16px;">{row['Status']}</div>
-            <div style="font-size:34px;">{int(row['Quantidade'])}</div>
-        </div>
-        """,
-        unsafe_allow_html=True
+    resumo_geral = (
+        df_filtrado["Status Operacional"]
+        .value_counts()
+        .reset_index()
     )
+    resumo_geral.columns = ["Status", "Quantidade"]
 
-st.divider()
+    cols = st.columns(len(resumo_geral))
+    for i, row in resumo_geral.iterrows():
+        cor = cor_status(row["Status"])
+        cols[i].markdown(
+            f"""
+            <div style="
+                background:{cor};
+                padding:20px;
+                border-radius:12px;
+                text-align:center;
+                color:white;
+                font-weight:bold;
+            ">
+                <div style="font-size:16px;">{row['Status']}</div>
+                <div style="font-size:34px;">{int(row['Quantidade'])}</div>
+            </div>
+            """,
+            unsafe_allow_html=True
+        )
+
+    st.divider()
 
 # =========================================================
 # RESUMO POR CAMPANHA (ESTILO EXCEL)
 # =========================================================
-st.subheader("Resumo por Campanha")
-st.caption("Campanhas com atraso aparecem no topo.")
+if not df_filtrado.empty and "Campanha ou Ação" in df_filtrado.columns:
+    st.subheader("Resumo por Campanha")
+    st.caption("Campanhas com atraso aparecem no topo.")
 
-tabela_resumo = pd.pivot_table(
-    df_filtrado,
-    index="Campanha ou Ação",
-    columns="Status Operacional",
-    aggfunc="size",
-    fill_value=0
-)
+    try:
+        tabela_resumo = pd.pivot_table(
+            df_filtrado,
+            index="Campanha ou Ação",
+            columns="Status Operacional",
+            aggfunc="size",
+            fill_value=0
+        )
 
-tabela_resumo["Total"] = tabela_resumo.sum(axis=1)
+        tabela_resumo["Total"] = tabela_resumo.sum(axis=1)
 
-campanhas_atrasadas = (
-    df_filtrado[df_filtrado["Semáforo"] == "Atrasado"]
-    ["Campanha ou Ação"]
-    .unique()
-)
+        if "Semáforo" in df_filtrado.columns:
+            campanhas_atrasadas = (
+                df_filtrado[df_filtrado["Semáforo"] == "Atrasado"]
+                ["Campanha ou Ação"]
+                .unique()
+            )
+            tabela_resumo["Atrasada"] = tabela_resumo.index.isin(campanhas_atrasadas)
+            tabela_resumo = tabela_resumo.sort_values(
+                by=["Atrasada", "Total"],
+                ascending=[False, False]
+            ).reset_index()
+        else:
+            tabela_resumo = tabela_resumo.sort_values(
+                by="Total",
+                ascending=False
+            ).reset_index()
+            tabela_resumo["Atrasada"] = False
 
-tabela_resumo["Atrasada"] = tabela_resumo.index.isin(campanhas_atrasadas)
-tabela_resumo = tabela_resumo.sort_values(
-    by=["Atrasada", "Total"],
-    ascending=[False, False]
-).reset_index()
+        def destacar_campanha(row):
+            if row["Atrasada"]:
+                return ["background-color:#FECACA"] * len(row)
+            return [""] * len(row)
 
-def destacar_campanha(row):
-    if row["Atrasada"]:
-        return ["background-color:#FECACA"] * len(row)
-    return [""] * len(row)
+        st.dataframe(
+            tabela_resumo.style.apply(destacar_campanha, axis=1),
+            use_container_width=True
+        )
+    except Exception as e:
+        st.warning("Não foi possível gerar o resumo por campanha.")
 
-st.dataframe(
-    tabela_resumo.style.apply(destacar_campanha, axis=1),
-    use_container_width=True
-)
-
-st.divider()
+    st.divider()
 
 # =========================================================
 # TABELA DETALHADA
 # =========================================================
-st.subheader("Detalhamento dos Jobs")
-st.caption("Dados completos conforme filtros aplicados.")
+if not df_filtrado.empty:
+    st.subheader("Detalhamento dos Jobs")
+    st.caption("Dados completos conforme filtros aplicados.")
 
-def destacar_semaforo(row):
-    if row["Semáforo"] == "Atrasado":
-        return ["background-color:#FECACA"] * len(row)
-    elif row["Semáforo"] == "Atenção":
-        return ["background-color:#DCFCE7"] * len(row)
-    return [""] * len(row)
+    def destacar_semaforo(row):
+        if "Semáforo" not in row.index:
+            return [""] * len(row)
+        if row["Semáforo"] == "Atrasado":
+            return ["background-color:#FECACA"] * len(row)
+        elif row["Semáforo"] == "Atenção":
+            return ["background-color:#DCFCE7"] * len(row)
+        return [""] * len(row)
 
-st.dataframe(
-    df_filtrado.style.apply(destacar_semaforo, axis=1),
-    use_container_width=True
-)
+    try:
+        st.dataframe(
+            df_filtrado.style.apply(destacar_semaforo, axis=1),
+            use_container_width=True,
+            height=400
+        )
+    except Exception as e:
+        st.dataframe(df_filtrado, use_container_width=True, height=400)
+else:
+    st.warning("Nenhum dado encontrado com os filtros aplicados.")
+
+# =========================================================
+# RODAPÉ COM INFORMAÇÕES
+# =========================================================
+st.sidebar.divider()
+st.sidebar.caption(f"📊 Total de registros: {len(df_filtrado)}")
+st.sidebar.caption(f"📁 Fonte: jobs.xlsx")
+st.sidebar.caption("Atualizado automaticamente")
+
+# =========================================================
+# MENSAGEM DE AJUDA PARA DEPLOY
+# =========================================================
+if "openpyxl" not in globals():
+    with st.expander("⚠️ Problemas no deploy?"):
+        st.markdown("""
+        **Se estiver com erro de "ModuleNotFoundError: No module named 'openpyxl'":**
+
+        1. **Crie um arquivo `requirements.txt`** na raiz do projeto com:
+        ```
+        streamlit==1.54.0
+        pandas==2.3.3
+        openpyxl>=3.0.0
+        ```
+
+        2. **Commit e push para o GitHub:**
+        ```bash
+        git add requirements.txt
+        git commit -m "Add dependencies"
+        git push origin main
+        ```
+
+        3. **O Streamlit Cloud** reinstalará as dependências automaticamente.
+
+        4. **Verifique os logs** em "Manage app" → "Logs"
+        """)
