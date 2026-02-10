@@ -1,5 +1,6 @@
 import streamlit as st
 import pandas as pd
+import openpyxl
 
 st.set_page_config(page_title="Dashboard de Campanhas - SICOOB COCRED", layout="wide")
 
