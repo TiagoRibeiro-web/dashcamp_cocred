@@ -481,73 +481,7 @@ else:
     st.info("👆 Use os filtros acima para refinar os dados")
 
 # =========================================================
-# 8. ANÁLISE DE PRAZOS (se houver coluna)
-# =========================================================
-
-if 'Prazo em dias' in df.columns or 'Prazo' in df.columns:
-    st.header("⏱️ Análise de Prazos")
-    
-    # Encontrar coluna de prazo
-    coluna_prazo = 'Prazo em dias' if 'Prazo em dias' in df.columns else 'Prazo'
-    
-    # Processar prazos
-    df_temp = df.copy()
-    df_temp[coluna_prazo] = df_temp[coluna_prazo].astype(str).str.strip()
-    
-    # Classificar
-    def classificar_prazo(x):
-        if pd.isna(x) or str(x).lower() in ['nan', 'none', 'na', '']:
-            return "Sem prazo definido"
-        elif 'encerrado' in str(x).lower() or 'concluído' in str(x).lower():
-            return "Prazo encerrado"
-        else:
-            try:
-                dias = int(float(str(x)))
-                if dias < 0:
-                    return f"Atrasado ({abs(dias)} dias)"
-                elif dias == 0:
-                    return "Vence hoje"
-                elif dias <= 3:
-                    return f"Urgente ({dias} dias)"
-                elif dias <= 7:
-                    return f"Próxima semana ({dias} dias)"
-                else:
-                    return f"Em prazo ({dias} dias)"
-            except:
-                return str(x)
-    
-    df_temp['Situação do Prazo'] = df_temp[coluna_prazo].apply(classificar_prazo)
-    
-    # Mostrar distribuição
-    col_prazo1, col_prazo2 = st.columns(2)
-    
-    with col_prazo1:
-        situacao_counts = df_temp['Situação do Prazo'].value_counts()
-        st.bar_chart(situacao_counts)
-    
-    with col_prazo2:
-        st.write("**Distribuição dos Prazos:**")
-        for situacao, count in situacao_counts.items():
-            porcentagem = (count / total_linhas * 100) if total_linhas > 0 else 0
-            st.write(f"• **{situacao}:** {count} ({porcentagem:.1f}%)")
-    
-    # Mostrar tabela de prazos críticos
-    st.subheader("🚨 Prazos Críticos (≤ 3 dias)")
-    prazos_criticos = df_temp[df_temp['Situação do Prazo'].str.contains('Urgente|Vence hoje|Atrasado')]
-    
-    if len(prazos_criticos) > 0:
-        st.dataframe(
-            prazos_criticos[['ID', 'Título', coluna_prazo, 'Situação do Prazo', 'Responsável']] 
-            if 'Responsável' in prazos_criticos.columns else 
-            prazos_criticos[['ID', 'Título', coluna_prazo, 'Situação do Prazo']],
-            use_container_width=True,
-            height=300
-        )
-    else:
-        st.success("✅ Nenhum prazo crítico identificado!")
-
-# =========================================================
-# 9. EXPORTAÇÃO
+# 8. EXPORTAÇÃO
 # =========================================================
 
 st.header("💾 Exportar Dados")
@@ -602,7 +536,7 @@ with col_exp3:
     )
 
 # =========================================================
-# 10. DEBUG INFO (apenas se ativado)
+# 9. DEBUG INFO (apenas se ativado)
 # =========================================================
 
 if st.session_state.debug_mode:
@@ -646,7 +580,7 @@ if st.session_state.debug_mode:
         st.dataframe(tipos_df, use_container_width=True)
 
 # =========================================================
-# 11. RODAPÉ
+# 10. RODAPÉ
 # =========================================================
 
 st.divider()
@@ -663,7 +597,7 @@ with footer_col3:
     st.caption("🔄 Atualiza a cada 1 minuto | 📧 cristini.cordesco@ideatoreamericas.com")
 
 # =========================================================
-# 12. AUTO-REFRESH (opcional)
+# 11. AUTO-REFRESH (opcional)
 # =========================================================
 
 # Auto-refresh a cada 60 segundos (opcional)
