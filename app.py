@@ -122,11 +122,6 @@ st.markdown("""
         color: inherit !important;
     }
     
-    /* Texto */
-    p, span, div {
-        color: inherit;
-    }
-    
     /* Links */
     a {
         color: #00A3E0 !important;
@@ -424,7 +419,6 @@ with st.sidebar:
 # =========================================================
 # INTERFACE PRINCIPAL
 # =========================================================
-
 st.markdown(f"""
 <div style="display: flex; align-items: center; margin-bottom: 20px;">
     <h1 style="color: #003366; margin: 0;">📊 Dashboard de Campanhas</h1>
@@ -438,8 +432,6 @@ st.caption(f"🔗 Conectado ao Excel Online | Aba: {SHEET_NAME}")
 
 st.success(f"✅ **{total_linhas} registros** carregados com sucesso!")
 st.info(f"📋 **Colunas:** {', '.join(df.columns.tolist()[:5])}{'...' if len(df.columns) > 5 else ''}")
-
-st.header("📋 Análise de Dados")
 
 # =========================================================
 # TABS
@@ -498,13 +490,15 @@ with tab1:
         st.dataframe(df.iloc[inicio:fim], height=altura_pagina, use_container_width=True, hide_index=False)
 
 # =========================================================
-# TAB 2: ANÁLISE ESTRATÉGICA (COM PLOTLY DARK MODE)
+# TAB 2: ANÁLISE ESTRATÉGICA (CORRIGIDO - SEM ERROS)
 # =========================================================
 with tab2:
     st.markdown("## 📈 Análise Estratégica")
     
     # Configurações de template para Plotly (funciona em dark/light)
-    plotly_template = 'plotly_white' if not st.get_option('theme.base') == 'dark' else 'plotly_dark'
+    is_dark = st.get_option('theme.base') == 'dark'
+    plotly_template = 'plotly_dark' if is_dark else 'plotly_white'
+    text_color = 'white' if is_dark else 'black'
     
     # ========== 1. MÉTRICAS DE NEGÓCIO ==========
     st.markdown("""
@@ -573,7 +567,7 @@ with tab2:
     
     st.divider()
     
-    # ========== 2. ANÁLISE POR STATUS ==========
+    # ========== 2. ANÁLISE POR STATUS (CORRIGIDO) ==========
     st.markdown("""
     <div class="info-container-cocred">
         <p style="margin: 0; font-size: 14px;">
@@ -604,13 +598,20 @@ with tab2:
                 text='Quantidade',
                 template=plotly_template
             )
-            fig_status.update_traces(textposition='outside', textfont_color='inherit')
+            
+            # CORRIGIDO: textfont_color removido, usando texttemplate com cor condicional
+            fig_status.update_traces(
+                textposition='outside',
+                texttemplate='%{text}',
+                textfont=dict(size=12, color=text_color)
+            )
+            
             fig_status.update_layout(
                 height=400,
                 xaxis_title="Quantidade",
                 yaxis_title="",
                 showlegend=False,
-                font=dict(color='inherit'),
+                font=dict(color=text_color),
                 paper_bgcolor='rgba(0,0,0,0)',
                 plot_bgcolor='rgba(0,0,0,0)'
             )
@@ -653,7 +654,7 @@ with tab2:
     
     st.divider()
     
-    # ========== 3. ANÁLISE POR SOLICITANTE ==========
+    # ========== 3. ANÁLISE POR SOLICITANTE (CORRIGIDO) ==========
     if 'Solicitante' in df.columns:
         st.markdown("""
         <div class="info-container-cocred">
@@ -679,13 +680,20 @@ with tab2:
                 text='Quantidade',
                 template=plotly_template
             )
-            fig_sol.update_traces(textposition='outside', textfont_color='inherit')
+            
+            # CORRIGIDO: textfont_color removido
+            fig_sol.update_traces(
+                textposition='outside',
+                texttemplate='%{text}',
+                textfont=dict(size=12, color=text_color)
+            )
+            
             fig_sol.update_layout(
                 height=350,
                 xaxis_title="",
                 yaxis_title="Número de Demandas",
                 showlegend=False,
-                font=dict(color='inherit'),
+                font=dict(color=text_color),
                 paper_bgcolor='rgba(0,0,0,0)',
                 plot_bgcolor='rgba(0,0,0,0)'
             )
@@ -720,7 +728,7 @@ with tab2:
     
     st.divider()
     
-    # ========== 4. ANÁLISE TEMPORAL ==========
+    # ========== 4. ANÁLISE TEMPORAL (CORRIGIDO) ==========
     if 'Data de Solicitação' in df.columns:
         st.markdown("""
         <div class="info-container-cocred">
@@ -746,12 +754,16 @@ with tab2:
                 line_shape='linear',
                 template=plotly_template
             )
-            fig_evolucao.update_traces(line_color='#003366', line_width=3, marker=dict(color='#00A3E0', size=8))
+            fig_evolucao.update_traces(
+                line_color='#003366', 
+                line_width=3, 
+                marker=dict(color='#00A3E0', size=8)
+            )
             fig_evolucao.update_layout(
                 height=300,
                 xaxis_title="",
                 yaxis_title="Número de Solicitações",
-                font=dict(color='inherit'),
+                font=dict(color=text_color),
                 paper_bgcolor='rgba(0,0,0,0)',
                 plot_bgcolor='rgba(0,0,0,0)'
             )
@@ -781,7 +793,7 @@ with tab2:
     
     st.divider()
     
-    # ========== 5. ANÁLISE DE PRODUÇÃO ==========
+    # ========== 5. ANÁLISE DE PRODUÇÃO (CORRIGIDO) ==========
     if 'Produção' in df.columns:
         st.markdown("""
         <div class="info-container-cocred">
@@ -807,15 +819,18 @@ with tab2:
                 template=plotly_template,
                 hole=0.4
             )
+            
+            # CORRIGIDO: textfont_color removido
             fig_prod.update_traces(
                 textposition='outside', 
                 textinfo='percent+label',
-                textfont_color='inherit',
+                textfont=dict(size=12, color=text_color),
                 marker=dict(line=dict(color='rgba(0,0,0,0)', width=0))
             )
+            
             fig_prod.update_layout(
                 height=300,
-                font=dict(color='inherit'),
+                font=dict(color=text_color),
                 paper_bgcolor='rgba(0,0,0,0)',
                 plot_bgcolor='rgba(0,0,0,0)',
                 showlegend=True,
@@ -890,13 +905,15 @@ with tab3:
         st.info("👆 Digite um termo acima para pesquisar nos dados")
 
 # =========================================================
-# TAB 4: KPIs COCRED (COM PLOTLY DARK MODE)
+# TAB 4: KPIs COCRED (CORRIGIDO)
 # =========================================================
 with tab4:
     st.markdown("## 🎯 KPIs - Campanhas COCRED")
     
     # Configurações de template para Plotly
-    plotly_template = 'plotly_white' if not st.get_option('theme.base') == 'dark' else 'plotly_dark'
+    is_dark = st.get_option('theme.base') == 'dark'
+    plotly_template = 'plotly_dark' if is_dark else 'plotly_white'
+    text_color = 'white' if is_dark else 'black'
     
     # ========== DESCRIÇÃO ==========
     st.markdown("""
@@ -1033,7 +1050,7 @@ with tab4:
     
     st.divider()
     
-    # ========== GRÁFICOS ==========
+    # ========== GRÁFICOS (CORRIGIDOS) ==========
     col_chart1, col_chart2 = st.columns([3, 2])
     
     with col_chart1:
@@ -1069,11 +1086,18 @@ with tab4:
             text='Quantidade',
             template=plotly_template
         )
-        fig_campanhas.update_traces(textposition='outside', textfont_color='inherit')
+        
+        # CORRIGIDO: textfont_color removido
+        fig_campanhas.update_traces(
+            textposition='outside',
+            texttemplate='%{text}',
+            textfont=dict(size=12, color=text_color)
+        )
+        
         fig_campanhas.update_layout(
             height=400,
             showlegend=False,
-            font=dict(color='inherit'),
+            font=dict(color=text_color),
             paper_bgcolor='rgba(0,0,0,0)',
             plot_bgcolor='rgba(0,0,0,0)'
         )
@@ -1108,15 +1132,18 @@ with tab4:
             template=plotly_template,
             hole=0.4
         )
+        
+        # CORRIGIDO: textfont_color removido
         fig_status.update_traces(
             textposition='outside', 
             textinfo='percent+label',
-            textfont_color='inherit',
+            textfont=dict(size=12, color=text_color),
             marker=dict(line=dict(color='rgba(0,0,0,0)', width=0))
         )
+        
         fig_status.update_layout(
             height=400,
-            font=dict(color='inherit'),
+            font=dict(color=text_color),
             paper_bgcolor='rgba(0,0,0,0)',
             plot_bgcolor='rgba(0,0,0,0)',
             showlegend=True,
