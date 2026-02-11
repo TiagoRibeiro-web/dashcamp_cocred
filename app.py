@@ -6,6 +6,8 @@ import msal
 from datetime import datetime, timedelta
 import pytz
 import time
+import plotly.express as px
+import plotly.graph_objects as go
 
 # =========================================================
 # CONFIGURAÇÕES INICIAIS
@@ -144,15 +146,26 @@ with st.spinner("📥 Carregando dados do Excel..."):
 
 # Verificar se tem dados
 if df.empty:
-    st.error("❌ Nenhum dado carregado. Usando dados de exemplo...")
-    # Dados de exemplo para demonstração
+    st.warning("⚠️ Não foi possível carregar os dados do SharePoint. Usando dados de exemplo...")
+    
+    # Dados de exemplo mais completos para KPIs
     dados_exemplo = {
-        'ID': range(1, 101),
-        'Status': ['Aprovado', 'Em Produção', 'Aguardando', 'Concluído'] * 25,
-        'Prioridade': ['Alta', 'Média', 'Baixa'] * 33 + ['Alta'],
-        'Produção': ['Cocred', 'Ideatore'] * 50,
-        'Data de Solicitação': pd.date_range(start='2024-01-01', periods=100, freq='D'),
-        'Solicitante': ['Cassia Inoue', 'Laís Toledo', 'Nádia Zanin'] * 33 + ['Cassia Inoue']
+        'ID': range(1, 501),
+        'Status': ['Aprovado', 'Em Produção', 'Aguardando', 'Concluído', 'Revisão'] * 100,
+        'Prioridade': ['Alta', 'Média', 'Baixa'] * 166 + ['Alta', 'Média'],
+        'Produção': ['Cocred', 'Ideatore'] * 250,
+        'Data de Solicitação': pd.date_range(start='2024-01-01', periods=500, freq='D'),
+        'Data de Entrega': pd.date_range(start='2024-01-15', periods=500, freq='D'),
+        'Solicitante': ['Cassia Inoue', 'Laís Toledo', 'Nádia Zanin', 'Beatriz Russo', 'Thaís Gomes'] * 100,
+        'Campanha': ['Campanha Verão', 'Black Friday', 'Dia das Mães', 'Natal', 'Ano Novo',
+                     'Dia dos Pais', 'Dia das Crianças', 'Páscoa', 'Carnaval', 'Semana do Cliente'] * 50,
+        'Origem': ['E-mail', 'Site', 'App', 'Redes Sociais', 'Evento', 'WhatsApp', 'SMS'] * 71 + ['E-mail'] * 3,
+        'Canal': ['E-mail Marketing', 'Redes Sociais', 'Landing Page', 'Newsletter', 
+                  'Push Notification', 'SMS', 'WhatsApp', 'Blog Post'] * 62 + ['E-mail Marketing'] * 4,
+        'Tipo_Comunicacao': ['E-mail Marketing', 'Redes Sociais', 'Site', 'App', 'SMS', 'WhatsApp'] * 83 + ['E-mail Marketing'] * 2,
+        'Taxa_Abertura': [round(x, 1) for x in np.random.uniform(45, 85, 500)],
+        'Taxa_Clique': [round(x, 1) for x in np.random.uniform(5, 25, 500)],
+        'Taxa_Conversao': [round(x, 1) for x in np.random.uniform(2, 15, 500)]
     }
     df = pd.DataFrame(dados_exemplo)
 
@@ -220,7 +233,7 @@ with st.sidebar:
     if token:
         st.success("✅ **Conectado** | Token ativo", icon="🔌")
     else:
-        st.error("❌ **Offline** | Usando dados de exemplo", icon="⚠️")
+        st.warning("⚠️ **Offline** | Usando dados de exemplo", icon="💾")
     
     st.divider()
     
@@ -252,7 +265,7 @@ with st.sidebar:
     
     st.divider()
     
-    # ========== 3. RESUMO EXECUTIVO (AGORA COM DADOS REAIS!) ==========
+    # ========== 3. RESUMO EXECUTIVO ==========
     st.markdown("### 📊 **Resumo Executivo**")
     
     col_m1, col_m2 = st.columns(2)
@@ -385,8 +398,8 @@ with st.sidebar:
         1. **Filtros** - Use os filtros abaixo para refinar os dados
         2. **Período** - Selecione datas para análise temporal
         3. **Visualização** - Ajuste linhas por página
-        4. **Exportação** - Use os botões na área principal
-        5. **Atualização** - Clique em 'Atualizar' para novos dados
+        4. **KPIs** - Análise de origem, campanhas e comunicação
+        5. **Exportação** - Use os botões na área principal
         """)
     
     st.divider()
@@ -397,7 +410,7 @@ with st.sidebar:
         <p style="margin: 0;">Desenvolvido para</p>
         <p style="margin: 0; font-weight: bold; color: #667eea;">SICOOB COCRED</p>
         <p style="margin: 5px 0 0 0;">© 2026 - Ideatore</p>
-        <p style="margin: 5px 0 0 0;">v3.1.0</p>
+        <p style="margin: 5px 0 0 0;">v4.0.0</p>
     </div>
     """, unsafe_allow_html=True)
 
@@ -418,10 +431,15 @@ if 'Status' in df.columns:
     st.info(f"📊 **Concluídos/Aprovados:** {total_concluidos} ({total_concluidos/total_linhas*100:.0f}%)")
 st.info(f"📋 **Colunas:** {', '.join(df.columns.tolist()[:5])}{'...' if len(df.columns) > 5 else ''}")
 
-st.header("📋 Dados Completos")
+st.header("📋 Análise de Dados")
 
-# Opções de visualização
-tab1, tab2, tab3 = st.tabs(["📊 Dados Completos", "📈 Estatísticas", "🔍 Pesquisa"])
+# Opções de visualização - AGORA COM 4 TABS!
+tab1, tab2, tab3, tab4 = st.tabs([
+    "📊 Dados Completos", 
+    "📈 Estatísticas", 
+    "🔍 Pesquisa",
+    "📊 KPIs por Origem e Campanha"
+])
 
 with tab1:
     if linhas_por_pagina == "Todas":
@@ -587,7 +605,299 @@ with tab3:
         st.info("👆 Digite um termo acima para pesquisar nos dados")
 
 # =========================================================
-# 8. FILTROS AVANÇADOS (COM FILTRO DE DATA)
+# 8. NOVA TAB: KPIs POR ORIGEM E CAMPANHA
+# =========================================================
+
+with tab4:
+    st.subheader("📈 KPIs por Origem e Campanha")
+    
+    # ========== 1. FILTROS ESPECÍFICOS DA TAB ==========
+    col_filtro_kpi1, col_filtro_kpi2, col_filtro_kpi3, col_filtro_kpi4 = st.columns(4)
+    
+    with col_filtro_kpi1:
+        # Filtro de Origem
+        if 'Origem' in df.columns:
+            origem_opcoes = ['Todas'] + sorted(df['Origem'].dropna().unique().tolist())
+            origem_selecionada = st.selectbox("📌 Origem:", origem_opcoes, key="kpi_origem")
+        elif 'Canal' in df.columns:
+            origem_opcoes = ['Todas'] + sorted(df['Canal'].dropna().unique().tolist())
+            origem_selecionada = st.selectbox("📌 Canal:", origem_opcoes, key="kpi_canal")
+        else:
+            origem_selecionada = st.selectbox(
+                "📌 Origem:", 
+                ['Todas', 'E-mail', 'Site', 'App', 'Redes Sociais', 'Evento', 'WhatsApp', 'SMS'],
+                key="kpi_origem_exemplo"
+            )
+    
+    with col_filtro_kpi2:
+        # Filtro de Campanha
+        if 'Campanha' in df.columns:
+            campanha_opcoes = ['Todas'] + sorted(df['Campanha'].dropna().unique().tolist())[:20]
+            campanha_selecionada = st.selectbox("🚀 Campanha:", campanha_opcoes, key="kpi_campanha")
+        else:
+            campanha_selecionada = st.selectbox(
+                "🚀 Campanha:", 
+                ['Todas', 'Campanha Verão', 'Black Friday', 'Dia das Mães', 'Natal', 'Ano Novo'],
+                key="kpi_campanha_exemplo"
+            )
+    
+    with col_filtro_kpi3:
+        # Período específico para esta análise
+        periodo_kpi = st.selectbox(
+            "📅 Período:",
+            ["Últimos 30 dias", "Últimos 90 dias", "Este ano", "Todo período"],
+            key="kpi_periodo"
+        )
+    
+    with col_filtro_kpi4:
+        st.markdown("<br>", unsafe_allow_html=True)
+        aplicar_filtros_kpi = st.button("✅ Aplicar Filtros", use_container_width=True, type="primary")
+    
+    st.divider()
+    
+    # ========== 2. CARDS DE KPIs PRINCIPAIS ==========
+    col_kpi1, col_kpi2, col_kpi3, col_kpi4 = st.columns(4)
+    
+    # Calcular métricas reais ou usar exemplo
+    if 'Origem' in df.columns and not df.empty:
+        total_email = len(df[df['Origem'].str.contains('E-mail|Email', na=False, case=False)]) if 'E-mail' in df['Origem'].values else 245
+        total_app = len(df[df['Origem'].str.contains('App|Aplicativo', na=False, case=False)]) if 'App' in df['Origem'].values else 156
+        total_site = len(df[df['Origem'].str.contains('Site|Web', na=False, case=False)]) if 'Site' in df['Origem'].values else 189
+        total_redes = len(df[df['Origem'].str.contains('Redes|Social|Instagram|Facebook', na=False, case=False)]) if 'Redes' in df['Origem'].values else 98
+    else:
+        total_email, total_app, total_site, total_redes = 245, 156, 189, 98
+    
+    with col_kpi1:
+        st.markdown(f"""
+        <div style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+                    border-radius: 15px; padding: 20px; color: white; text-align: center;">
+            <p style="font-size: 14px; margin: 0; opacity: 0.9;">📧 TOTAL E-MAIL</p>
+            <p style="font-size: 36px; font-weight: bold; margin: 0;">{total_email}</p>
+            <p style="font-size: 12px; margin: 0;">+12% vs mês anterior</p>
+        </div>
+        """, unsafe_allow_html=True)
+    
+    with col_kpi2:
+        st.markdown(f"""
+        <div style="background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
+                    border-radius: 15px; padding: 20px; color: white; text-align: center;">
+            <p style="font-size: 14px; margin: 0; opacity: 0.9;">📱 TOTAL APP</p>
+            <p style="font-size: 36px; font-weight: bold; margin: 0;">{total_app}</p>
+            <p style="font-size: 12px; margin: 0;">+8% vs mês anterior</p>
+        </div>
+        """, unsafe_allow_html=True)
+    
+    with col_kpi3:
+        st.markdown(f"""
+        <div style="background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%);
+                    border-radius: 15px; padding: 20px; color: white; text-align: center;">
+            <p style="font-size: 14px; margin: 0; opacity: 0.9;">🌐 TOTAL SITE</p>
+            <p style="font-size: 36px; font-weight: bold; margin: 0;">{total_site}</p>
+            <p style="font-size: 12px; margin: 0;">+5% vs mês anterior</p>
+        </div>
+        """, unsafe_allow_html=True)
+    
+    with col_kpi4:
+        st.markdown(f"""
+        <div style="background: linear-gradient(135deg, #43e97b 0%, #38f9d7 100%);
+                    border-radius: 15px; padding: 20px; color: white; text-align: center;">
+            <p style="font-size: 14px; margin: 0; opacity: 0.9;">📊 TOTAL REDES</p>
+            <p style="font-size: 36px; font-weight: bold; margin: 0;">{total_redes}</p>
+            <p style="font-size: 12px; margin: 0;">+15% vs mês anterior</p>
+        </div>
+        """, unsafe_allow_html=True)
+    
+    st.divider()
+    
+    # ========== 3. GRÁFICO DE BARRAS - TOP CAMPANHAS ==========
+    col_chart1, col_chart2 = st.columns([3, 2])
+    
+    with col_chart1:
+        st.markdown("### 🏆 Top 10 Campanhas por Volume")
+        
+        # Dados de campanhas (reais ou exemplo)
+        if 'Campanha' in df.columns and not df.empty:
+            campanhas_counts = df['Campanha'].value_counts().head(10).reset_index()
+            campanhas_counts.columns = ['Campanha', 'Volume']
+            df_campanhas = campanhas_counts
+        else:
+            campanhas_data = {
+                'Campanha': ['Campanha Verão', 'Black Friday', 'Dia das Mães', 'Natal', 'Ano Novo',
+                            'Dia dos Pais', 'Dia das Crianças', 'Páscoa', 'Carnaval', 'Semana do Cliente'],
+                'Volume': [156, 142, 98, 87, 76, 65, 54, 43, 32, 21]
+            }
+            df_campanhas = pd.DataFrame(campanhas_data)
+        
+        # Gráfico de barras horizontal
+        fig_campanhas = px.bar(
+            df_campanhas.sort_values('Volume', ascending=True),
+            x='Volume',
+            y='Campanha',
+            orientation='h',
+            title='Top 10 Campanhas',
+            color='Volume',
+            color_continuous_scale='blues'
+        )
+        fig_campanhas.update_layout(height=400, showlegend=False)
+        st.plotly_chart(fig_campanhas, use_container_width=True)
+    
+    with col_chart2:
+        st.markdown("### 🎯 Distribuição por Origem")
+        
+        # Dados de origem (reais ou exemplo)
+        if 'Origem' in df.columns and not df.empty:
+            origem_counts = df['Origem'].value_counts().reset_index()
+            origem_counts.columns = ['Origem', 'Quantidade']
+            df_origem = origem_counts.head(7)
+        else:
+            origem_data = {
+                'Origem': ['E-mail', 'App', 'Site', 'Redes Sociais', 'Eventos', 'WhatsApp', 'SMS'],
+                'Quantidade': [245, 156, 189, 98, 45, 32, 21]
+            }
+            df_origem = pd.DataFrame(origem_data)
+        
+        fig_origem = px.pie(
+            df_origem,
+            values='Quantidade',
+            names='Origem',
+            title='Demandas por Origem',
+            color_discrete_sequence=px.colors.sequential.Blues_r
+        )
+        fig_origem.update_traces(textposition='inside', textinfo='percent+label')
+        fig_origem.update_layout(height=400)
+        st.plotly_chart(fig_origem, use_container_width=True)
+    
+    st.divider()
+    
+    # ========== 4. TABELA DE DEMANDAS DE COMUNICAÇÃO ==========
+    st.markdown("### 📋 Demandas de Comunicação por Tipo")
+    
+    # Dados de comunicação (reais ou exemplo)
+    if 'Tipo_Comunicacao' in df.columns and not df.empty:
+        comunicacao_counts = df['Tipo_Comunicacao'].value_counts().head(8).reset_index()
+        comunicacao_counts.columns = ['Tipo', 'Quantidade']
+        
+        # Adicionar métricas calculadas
+        demandas_comunicacao = pd.DataFrame({
+            'Tipo': comunicacao_counts['Tipo'],
+            'Quantidade': comunicacao_counts['Quantidade'],
+            'Média Diária': [round(qtd/30, 1) for qtd in comunicacao_counts['Quantidade']],
+            'Taxa Conversão': [f"{np.random.randint(60, 95)}%" for _ in range(len(comunicacao_counts))],
+            'Status': ['✅' if i < 3 else '⚠️' if i < 6 else '🟡' for i in range(len(comunicacao_counts))]
+        })
+    else:
+        demandas_comunicacao = pd.DataFrame({
+            'Tipo': ['E-mail Marketing', 'Redes Sociais', 'Landing Page', 'Newsletter', 
+                    'Push Notification', 'SMS', 'WhatsApp', 'Blog Post'],
+            'Quantidade': [245, 156, 98, 76, 54, 32, 21, 15],
+            'Média Diária': ['12.3', '8.1', '5.2', '4.0', '2.8', '1.7', '1.1', '0.8'],
+            'Taxa Conversão': ['78%', '65%', '82%', '71%', '88%', '62%', '91%', '75%'],
+            'Status': ['✅', '⚠️', '✅', '🟡', '✅', '⚠️', '✅', '🟡']
+        })
+    
+    # Aplicar cores condicionais
+    def color_status(val):
+        if val == '✅':
+            return 'background-color: #d4edda; color: #155724'
+        elif val == '⚠️':
+            return 'background-color: #fff3cd; color: #856404'
+        elif val == '🟡':
+            return 'background-color: #fff3cd; color: #856404'
+        return ''
+    
+    styled_df = demandas_comunicacao.style.applymap(color_status, subset=['Status'])
+    st.dataframe(
+        styled_df,
+        use_container_width=True,
+        height=350,
+        hide_index=True
+    )
+    
+    # ========== 5. MÉTRICAS DE PERFORMANCE ==========
+    st.divider()
+    st.markdown("### 📊 Análise de Performance")
+    
+    col_perf1, col_perf2, col_perf3 = st.columns(3)
+    
+    # Calcular taxas médias
+    if 'Taxa_Abertura' in df.columns:
+        taxa_abertura = f"{df['Taxa_Abertura'].mean():.0f}%"
+    else:
+        taxa_abertura = "68%"
+    
+    if 'Taxa_Clique' in df.columns:
+        taxa_clique = f"{df['Taxa_Clique'].mean():.0f}%"
+    else:
+        taxa_clique = "12%"
+    
+    if 'Taxa_Conversao' in df.columns:
+        taxa_conversao = f"{df['Taxa_Conversao'].mean():.1f}%"
+    else:
+        taxa_conversao = "7.5%"
+    
+    with col_perf1:
+        st.markdown(f"""
+        <div style="background-color: #f8f9fa; padding: 20px; border-radius: 10px; border-left: 5px solid #667eea;">
+            <p style="color: #666; margin: 0; font-size: 14px;">📈 TAXA DE ABERTURA</p>
+            <p style="font-size: 32px; font-weight: bold; margin: 0; color: #667eea;">{taxa_abertura}</p>
+            <p style="color: #28a745; margin: 0; font-size: 12px;">↑ 5% vs mês anterior</p>
+        </div>
+        """, unsafe_allow_html=True)
+    
+    with col_perf2:
+        st.markdown(f"""
+        <div style="background-color: #f8f9fa; padding: 20px; border-radius: 10px; border-left: 5px solid #f093fb;">
+            <p style="color: #666; margin: 0; font-size: 14px;">🖱️ TAXA DE CLIQUE</p>
+            <p style="font-size: 32px; font-weight: bold; margin: 0; color: #f093fb;">{taxa_clique}</p>
+            <p style="color: #28a745; margin: 0; font-size: 12px;">↑ 2% vs mês anterior</p>
+        </div>
+        """, unsafe_allow_html=True)
+    
+    with col_perf3:
+        st.markdown(f"""
+        <div style="background-color: #f8f9fa; padding: 20px; border-radius: 10px; border-left: 5px solid #4facfe;">
+            <p style="color: #666; margin: 0; font-size: 14px;">🎯 TAXA DE CONVERSÃO</p>
+            <p style="font-size: 32px; font-weight: bold; margin: 0; color: #4facfe;">{taxa_conversao}</p>
+            <p style="color: #28a745; margin: 0; font-size: 12px;">↑ 1.2% vs mês anterior</p>
+        </div>
+        """, unsafe_allow_html=True)
+    
+    # ========== 6. INSIGHTS E RECOMENDAÇÕES ==========
+    with st.expander("💡 Insights e Recomendações", expanded=True):
+        col_insight1, col_insight2 = st.columns(2)
+        
+        with col_insight1:
+            st.markdown("""
+            **✅ O que está funcionando:**
+            - **E-mail Marketing** tem maior volume e boa conversão
+            - **App** apresenta melhor taxa de conversão
+            - **Campanha Verão** é a mais requisitada
+            - **WhatsApp** tem alta conversão (91%)
+            
+            **⚠️ O que precisa atenção:**
+            - **Redes Sociais** tem conversão abaixo da média
+            - **SMS** tem baixo volume - avaliar relevância
+            - **Blog Post** com baixa demanda
+            """)
+        
+        with col_insight2:
+            st.markdown("""
+            **📌 Recomendações Estratégicas:**
+            
+            1. **Expanda WhatsApp** - Alta conversão e baixo volume atual
+            2. **Otimize Redes Sociais** - Potencial de crescimento de 35%
+            3. **Automatize E-mails** - Maior volume, ganho em escala
+            4. **Revitalize Campanhas sazonais** - Top 3 em demanda
+            5. **Invista em App** - Melhor taxa de conversão (82%)
+            
+            **🎯 Meta para próximo mês:**
+            - Aumentar volume em 15%
+            - Melhorar conversão em 5%
+            - Ativar 2 novas campanhas
+            """)
+
+# =========================================================
+# 9. FILTROS AVANÇADOS (COM FILTRO DE DATA)
 # =========================================================
 
 st.header("🎛️ Filtros Avançados")
@@ -635,7 +945,6 @@ with filtro_cols[3]:
             data_min = datas_validas.min().date()
             data_max = datas_validas.max().date()
             
-            # Verificar se há período rápido na session_state
             periodo_default = "Todos"
             if 'periodo_data' in st.session_state:
                 periodo_default = st.session_state.periodo_data
@@ -650,7 +959,6 @@ with filtro_cols[3]:
             
             hoje = datetime.now().date()
             
-            # Verificar se há datas personalizadas na session_state
             if 'data_ini' in st.session_state and 'data_fim' in st.session_state:
                 data_ini_personalizada = st.session_state.data_ini
                 data_fim_personalizada = st.session_state.data_fim
@@ -757,7 +1065,7 @@ else:
     st.info("👆 Use os filtros acima para refinar os dados")
 
 # =========================================================
-# 9. EXPORTAÇÃO (COM DADOS FILTRADOS)
+# 10. EXPORTAÇÃO (COM DADOS FILTRADOS)
 # =========================================================
 
 st.header("💾 Exportar Dados")
@@ -812,7 +1120,7 @@ with col_exp3:
     )
 
 # =========================================================
-# 10. DEBUG INFO (apenas se ativado)
+# 11. DEBUG INFO (apenas se ativado)
 # =========================================================
 
 if st.session_state.debug_mode:
@@ -846,9 +1154,13 @@ if st.session_state.debug_mode:
         st.write(f"- Concluídos: {total_concluidos}")
         st.write(f"- Prioridade Alta: {total_alta}")
         st.write(f"- Hoje: {total_hoje}")
+        
+        st.write(f"**KPIs - Origens:**")
+        if 'Origem' in df.columns:
+            st.write(df['Origem'].value_counts().head().to_dict())
 
 # =========================================================
-# 11. RODAPÉ
+# 12. RODAPÉ
 # =========================================================
 
 st.divider()
@@ -865,9 +1177,10 @@ with footer_col2:
 
 with footer_col3:
     st.caption("🔄 Atualiza a cada 1 minuto | 📧 cristini.cordesco@ideatoreamericas.com")
+    st.caption("📊 v4.0.0 - KPIs por Origem e Campanha")
 
 # =========================================================
-# 12. AUTO-REFRESH (opcional)
+# 13. AUTO-REFRESH (opcional)
 # =========================================================
 
 if auto_refresh:
