@@ -1,388 +1,328 @@
 import streamlit as st
 import pandas as pd
-import openpyxl
+import requests
+from io import BytesIO
+import msal
+from datetime import datetime
+import pytz
+import time
 
+# =========================================================
+# CONFIGURAÇÕES DA API (AJUSTE AQUI!)
+# =========================================================
 st.set_page_config(page_title="Dashboard de Campanhas - SICOOB COCRED", layout="wide")
 
+# 1. SUAS CREDENCIAIS DA GRAPH API (do Azure AD)
+MS_CLIENT_ID = st.secrets.get("MS_CLIENT_ID", "")        # Application ID
+MS_CLIENT_SECRET = st.secrets.get("MS_CLIENT_SECRET", "") # Secret VALUE
+MS_TENANT_ID = st.secrets.get("MS_TENANT_ID", "")        # Directory ID
+
+# 2. INFORMAÇÕES DO SEU EXCEL ONLINE
+SHAREPOINT_FILE_ID = "IQDMDcVdgAfGSIyZfeke7NFkAatm3fhI0-X4r6gIPQJmosY"  # ID do arquivo
+SHEET_NAME = "Demandas ID"  # ← NOME DA ABA QUE VOCÊ MENCIONOU!
+
+# 3. SITE DO SHAREPOINT (do seu link)
+SHAREPOINT_SITE = "agenciaideatore.sharepoint.com"
+SHAREPOINT_SITE_PATH = "/personal/cristini_cordesco_ideatoreamericas_com"
+
 # =========================================================
-# CARREGAMENTO E TRATAMENTO DOS DADOS
+# 1. AUTENTICAÇÃO MICROSOFT GRAPH
 # =========================================================
-@st.cache_data
-def carregar_dados():
-    df = pd.read_excel("jobs.xlsx", engine='openpyxl')
-
-    # -------------------------
-    # Tratamento do prazo
-    # -------------------------
-    if "Prazo em dias" in df.columns:
-        df["Prazo em dias"] = (
-            df["Prazo em dias"]
-            .astype(str)
-            .str.strip()
+@st.cache_resource
+def get_msal_app():
+    """Configura a aplicação MSAL com suas credenciais"""
+    if not all([MS_CLIENT_ID, MS_CLIENT_SECRET, MS_TENANT_ID]):
+        st.error("❌ Credenciais da API não configuradas!")
+        st.info("""
+        Configure no Streamlit Cloud:
+        Settings → Secrets → Adicione:
+        ```
+        MS_CLIENT_ID = "seu-application-id"
+        MS_CLIENT_SECRET = "seu-secret-value"  # O VALOR, não o ID!
+        MS_TENANT_ID = "seu-tenant-id"
+        ```
+        """)
+        return None
+    
+    try:
+        authority = f"https://login.microsoftonline.com/{MS_TENANT_ID}"
+        
+        app = msal.ConfidentialClientApplication(
+            MS_CLIENT_ID,
+            authority=authority,
+            client_credential=MS_CLIENT_SECRET
         )
+        
+        return app
+    except Exception as e:
+        st.error(f"❌ Erro ao configurar MSAL: {str(e)}")
+        return None
 
-        # Situação do prazo
-        df["Situação do Prazo"] = df["Prazo em dias"].apply(
-            lambda x: "Prazo encerrado"
-            if "encerrado" in x.lower()
-            else "Em prazo"
+@st.cache_data(ttl=3500)  # Token válido por ~1 hora
+def get_access_token():
+    """Obtém access token para Microsoft Graph"""
+    app = get_msal_app()
+    if not app:
+        return None
+    
+    try:
+        result = app.acquire_token_for_client(
+            scopes=["https://graph.microsoft.com/.default"]
         )
-
-        # Converter números
-        df["Prazo em dias"] = pd.to_numeric(
-            df["Prazo em dias"], errors="coerce"
-        )
-
-    # -------------------------
-    # Faixa de prazo (checkbox)
-    # -------------------------
-    def classificar_faixa(row):
-        if row["Situação do Prazo"] == "Prazo encerrado":
-            return "Prazo encerrado"
-        if pd.isna(row["Prazo em dias"]):
-            return "Sem prazo"
-        if row["Prazo em dias"] <= 0:
-            return "Prazo encerrado"
-        elif row["Prazo em dias"] <= 5:
-            return "1 a 5 dias"
-        elif row["Prazo em dias"] <= 10:
-            return "6 a 10 dias"
+        
+        if "access_token" in result:
+            return result["access_token"]
         else:
-            return "Acima de 10 dias"
+            error_msg = result.get("error_description", "Erro desconhecido")
+            st.error(f"❌ Falha na autenticação: {error_msg}")
+            return None
+    except Exception as e:
+        st.error(f"❌ Erro ao obter token: {str(e)}")
+        return None
 
-    df["Faixa de Prazo"] = df.apply(classificar_faixa, axis=1)
-
-    # -------------------------
-    # Semáforo
-    # -------------------------
-    def classificar_semaforo(row):
-        if row["Faixa de Prazo"] == "Prazo encerrado":
-            return "Atrasado"
-        elif row["Faixa de Prazo"] == "1 a 5 dias":
-            return "Atenção"
+# =========================================================
+# 2. CARREGAR DADOS DO EXCEL ONLINE
+# =========================================================
+@st.cache_data(ttl=300)  # Cache de 5 minutos para os dados
+def carregar_dados_excel_online():
+    """Carrega dados da aba 'Demandas ID' do Excel Online"""
+    
+    access_token = get_access_token()
+    if not access_token:
+        return pd.DataFrame()
+    
+    # URL para baixar o arquivo Excel
+    file_url = f"https://graph.microsoft.com/v1.0/drives/root/items/{SHAREPOINT_FILE_ID}/content"
+    
+    headers = {
+        "Authorization": f"Bearer {access_token}",
+        "Accept": "application/octet-stream"
+    }
+    
+    try:
+        with st.spinner("🔄 Conectando ao Excel Online..."):
+            # Baixar o arquivo Excel
+            response = requests.get(file_url, headers=headers, timeout=30)
+        
+        if response.status_code == 200:
+            # Ler o arquivo Excel
+            excel_file = BytesIO(response.content)
+            
+            # Tentar ler a aba específica "Demandas ID"
+            try:
+                df = pd.read_excel(excel_file, sheet_name=SHEET_NAME, engine='openpyxl')
+            except Exception as e:
+                st.warning(f"⚠️ Não encontrei aba '{SHEET_NAME}'. Tentando primeira aba...")
+                df = pd.read_excel(excel_file, engine='openpyxl')
+            
+            # Verificar se carregou dados
+            if df.empty:
+                st.error(f"❌ A aba '{SHEET_NAME}' está vazia ou não encontrada.")
+                return pd.DataFrame()
+            
+            # Pegar informações do arquivo
+            metadata_url = f"https://graph.microsoft.com/v1.0/drives/root/items/{SHAREPOINT_FILE_ID}"
+            meta_response = requests.get(metadata_url, headers=headers)
+            
+            if meta_response.status_code == 200:
+                metadata = meta_response.json()
+                last_modified = metadata.get('lastModifiedDateTime', '')
+                
+                if last_modified:
+                    # Converter para horário Brasil
+                    dt = datetime.fromisoformat(last_modified.replace('Z', '+00:00'))
+                    dt_brazil = dt.astimezone(pytz.timezone('America/Sao_Paulo'))
+                    
+                    # Mostrar no sidebar
+                    st.sidebar.success(f"✅ Conectado: {SHEET_NAME}")
+                    st.sidebar.caption(f"📅 Última atualização: {dt_brazil.strftime('%d/%m %H:%M')}")
+                    
+                    # Mostrar quem modificou
+                    modified_by = metadata.get('lastModifiedBy', {}).get('user', {}).get('displayName', '')
+                    if modified_by:
+                        st.sidebar.caption(f"👤 Por: {modified_by}")
+            
+            st.sidebar.caption(f"📊 {len(df)} registros carregados")
+            
+            return df
+            
+        elif response.status_code == 404:
+            st.error("❌ Arquivo não encontrado no SharePoint")
+            st.info(f"Verifique o File ID: {SHAREPOINT_FILE_ID}")
+            
+        elif response.status_code == 403:
+            st.error("❌ Permissão negada")
+            st.info("""
+            **Solução:**
+            1. Verifique se o app tem permissão "Files.Read.All"
+            2. Confirme que deu "Admin Consent" no Azure AD
+            """)
+            
+        elif response.status_code == 401:
+            st.error("❌ Token expirado")
+            st.cache_data.clear()  # Limpar cache para novo token
+            
         else:
-            return "No prazo"
-
-    df["Semáforo"] = df.apply(classificar_semaforo, axis=1)
-
-    return df
-
-
-df = carregar_dados()
-df = df.dropna(subset=["Campanha ou Ação", "Status Operacional"])
+            st.error(f"❌ Erro HTTP {response.status_code}")
+            st.text(f"Resposta: {response.text[:200]}")
+        
+        return pd.DataFrame()
+        
+    except requests.exceptions.Timeout:
+        st.error("⏱️ Timeout - Verifique sua conexão")
+        return pd.DataFrame()
+        
+    except Exception as e:
+        st.error(f"❌ Erro inesperado: {str(e)}")
+        return pd.DataFrame()
 
 # =========================================================
-# TÍTULO
+# 3. INTERFACE STREAMLIT
 # =========================================================
+
+# Título principal
 st.title("📊 Dashboard de Campanhas – SICOOB COCRED")
+st.caption(f"🔗 Conectado ao Excel Online | Aba: {SHEET_NAME}")
 
-# =========================================================
-# LEGENDA
-# =========================================================
-with st.expander("📌 Legendas e critérios"):
-    st.markdown("""
-**Semáforo de Prazo**
-- 🟢 **No prazo:** mais de 5 dias
-- 🟡 **Atenção:** 1 a 5 dias
-- 🔴 **Atrasado:** prazo encerrado ou vencido
+# Sidebar - Controles
+st.sidebar.header("⚙️ Controles")
 
-**Faixas de Prazo**
-- Prazo encerrado
-- 1 a 5 dias
-- 6 a 10 dias
-- Acima de 10 dias
+# Botão de atualização
+if st.sidebar.button("🔄 Atualizar agora", use_container_width=True, type="primary"):
+    st.cache_data.clear()
+    st.rerun()
+
+# Status da conexão
+st.sidebar.markdown("---")
+st.sidebar.markdown("**🔗 Status da Conexão:**")
+
+# Testar conexão
+if st.sidebar.button("🔍 Testar Conexão API", use_container_width=True):
+    token = get_access_token()
+    if token:
+        st.sidebar.success("✅ API: Conectada")
+        st.sidebar.code(f"Token: ...{token[-10:]}")
+    else:
+        st.sidebar.error("❌ API: Falha na conexão")
+
+# Link para editar
+st.sidebar.markdown("---")
+st.sidebar.markdown("**📝 Editar planilha:**")
+st.sidebar.markdown(f"""
+[✏️ Abrir no Excel Online](https://agenciaideatore-my.sharepoint.com/:x:/g/personal/cristini_cordesco_ideatoreamericas_com/IQDMDcVdgAfGSIyZfeke7NFkAatm3fhI0-X4r6gIPQJmosY?e=R0o2FK)
+
+**Instruções:**
+1. Edite na aba **"{SHEET_NAME}"**
+2. Salve (Ctrl+S)
+3. Dashboard atualiza em 5min
+4. Ou clique em "Atualizar agora"
 """)
 
 # =========================================================
-# FILTROS (SIDEBAR)
+# 4. CARREGAR DADOS
 # =========================================================
-st.sidebar.header("Filtros")
-st.sidebar.caption("Os dados são atualizados automaticamente conforme o Excel.")
 
-df_filtrado = df.copy()
+# Carregar dados do Excel Online
+df = carregar_dados_excel_online()
 
-# -------------------------
-# Filtro por faixa de prazo
-# -------------------------
-st.sidebar.subheader("Prazo")
-st.sidebar.caption("Filtra jobs por faixa de prazo.")
-
-faixas_ordem = [
-    "Prazo encerrado",
-    "1 a 5 dias",
-    "6 a 10 dias",
-    "Acima de 10 dias"
-]
-
-faixas_disponiveis = df["Faixa de Prazo"].unique()
-faixas_sel = []
-
-for faixa in faixas_ordem:
-    if faixa in faixas_disponiveis:
-        marcado = st.sidebar.checkbox(
-            faixa, value=True, key=f"faixa_{faixa}"
-        )
-        if marcado:
-            faixas_sel.append(faixa)
-
-df_filtrado = df_filtrado[df_filtrado["Faixa de Prazo"].isin(faixas_sel)]
-
-# -------------------------
-# Função genérica checkbox
-# -------------------------
-def filtro_checkbox(coluna, titulo, legenda):
-    valores = sorted(df[coluna].dropna().unique())
-    selecionados = []
-
-    st.sidebar.subheader(titulo)
-    st.sidebar.caption(legenda)
-
-    for valor in valores:
-        marcado = st.sidebar.checkbox(
-            str(valor), value=True, key=f"{coluna}_{valor}"
-        )
-        if marcado:
-            selecionados.append(valor)
-
-    return selecionados
-
-
-# Prioridade
-if "Prioridade" in df.columns:
-    prioridade_sel = filtro_checkbox(
-        "Prioridade", "Prioridade", "Nível de urgência do job."
-    )
-    df_filtrado = df_filtrado[df_filtrado["Prioridade"].isin(prioridade_sel)]
-
-# Produção
-if "Produção" in df.columns:
-    producao_sel = filtro_checkbox(
-        "Produção", "Produção", "Tipo ou canal de produção."
-    )
-    df_filtrado = df_filtrado[df_filtrado["Produção"].isin(producao_sel)]
-
-# Status
-status_sel = filtro_checkbox(
-    "Status Operacional", "Status", "Status atual do job."
-)
-df_filtrado = df_filtrado[df_filtrado["Status Operacional"].isin(status_sel)]
-
-# =========================================================
-# ALERTA DE ATRASO
-# =========================================================
-atrasados = df_filtrado[df_filtrado["Semáforo"] == "Atrasado"]
-if len(atrasados) > 0:
-    st.error(f"⚠️ {len(atrasados)} job(s) com prazo encerrado.")
-
-# =========================================================
-# RESUMO GERAL (CARDS)
-# =========================================================
-st.subheader("Resumo Geral")
-st.caption("Total de jobs por status operacional.")
-
-# Cores que funcionam em light/dark mode
-cores_status = {
-    "Aprovado": "#00A859",        # Verde SICOOB
-    "Em Produção": "#007A3D",     # Verde escuro
-    "Aguardando": "#7ED957",      # Verde claro
-}
-
-def cor_status(nome):
-    nome = nome.lower()
-    if "aprovado" in nome:
-        return cores_status["Aprovado"]
-    if "produção" in nome:
-        return cores_status["Em Produção"]
-    if "aguardando" in nome:
-        return cores_status["Aguardando"]
-    return "#6B7280"
-
-resumo_geral = (
-    df_filtrado["Status Operacional"]
-    .value_counts()
-    .reset_index()
-)
-resumo_geral.columns = ["Status", "Quantidade"]
-
-cols = st.columns(len(resumo_geral))
-for i, row in resumo_geral.iterrows():
-    cor = cor_status(row["Status"])
-    cols[i].markdown(
-        f"""
-        <div style="
-            background:{cor};
-            padding:20px;
-            border-radius:12px;
-            text-align:center;
-            color:white;
-            font-weight:bold;
-        ">
-            <div style="font-size:16px;">{row['Status']}</div>
-            <div style="font-size:34px;">{int(row['Quantidade'])}</div>
-        </div>
-        """,
-        unsafe_allow_html=True
-    )
-
-st.divider()
-
-# =========================================================
-# RESUMO POR CAMPANHA (ESTILO EXCEL)
-# =========================================================
-st.subheader("Resumo por Campanha")
-st.caption("Campanhas com atraso aparecem no topo.")
-
-tabela_resumo = pd.pivot_table(
-    df_filtrado,
-    index="Campanha ou Ação",
-    columns="Status Operacional",
-    aggfunc="size",
-    fill_value=0
-)
-
-tabela_resumo["Total"] = tabela_resumo.sum(axis=1)
-
-campanhas_atrasadas = (
-    df_filtrado[df_filtrado["Semáforo"] == "Atrasado"]
-    ["Campanha ou Ação"]
-    .unique()
-)
-
-tabela_resumo["Atrasada"] = tabela_resumo.index.isin(campanhas_atrasadas)
-tabela_resumo = tabela_resumo.sort_values(
-    by=["Atrasada", "Total"],
-    ascending=[False, False]
-).reset_index()
-
-# CORREÇÃO: Cores que funcionam em light/dark mode
-def destacar_campanha(row):
-    if row["Atrasada"]:
-        # Vermelho claro no light, vermelho escuro no dark
-        return ["background-color: rgba(254, 202, 202, 0.3)"] * len(row)
-    return [""] * len(row)
-
-st.dataframe(
-    tabela_resumo.style.apply(destacar_campanha, axis=1),
-    use_container_width=True
-)
-
-st.divider()
-
-# =========================================================
-# TABELA DETALHADA - CORRIGIDA PARA LIGHT/DARK
-# =========================================================
-st.subheader("Detalhamento dos Jobs")
-st.caption("Dados completos conforme filtros aplicados.")
-
-# Função com cores adaptativas para light/dark mode
-def destacar_semaforo(row):
-    # Usar transparência para funcionar em ambos os modos
-    if row["Semáforo"] == "Atrasado":
-        # Vermelho com transparência
-        return ["background-color: rgba(254, 202, 202, 0.3)"] * len(row)
-    elif row["Semáforo"] == "Atenção":
-        # Amarelo com transparência
-        return ["background-color: rgba(255, 243, 205, 0.5)"] * len(row)
-    elif row["Semáforo"] == "No prazo":
-        # Verde com transparência
-        return ["background-color: rgba(209, 231, 221, 0.4)"] * len(row)
-    return [""] * len(row)
-
-# Configurar o DataFrame com melhor formatação
-styled_df = df_filtrado.style.apply(destacar_semaforo, axis=1)
-
-# Adicionar formatação condicional para números
-if "Prazo em dias" in df_filtrado.columns:
-    styled_df = styled_df.format({
-        "Prazo em dias": "{:.0f}",
-    }, na_rep="N/A")
-
-# Configurações para melhor visualização
-st.dataframe(
-    styled_df,
-    use_container_width=True,
-    height=600,  # Altura fixa com scroll
-    column_config={
-        "Prazo em dias": st.column_config.NumberColumn(
-            "Prazo (dias)",
-            help="Prazo em dias para conclusão",
-            format="%d"
-        ),
-        "Prioridade": st.column_config.TextColumn(
-            "Prioridade",
-            help="Nível de prioridade"
-        ),
-        "Status Operacional": st.column_config.TextColumn(
-            "Status",
-            help="Status operacional atual"
-        ),
-        "Semáforo": st.column_config.TextColumn(
-            "Situação",
-            help="Situação do prazo: Atrasado, Atenção ou No prazo"
-        )
-    },
-    hide_index=True  # Oculta o índice numérico
-)
-
-# =========================================================
-# ESTILO CSS ADAPTATIVO PARA LIGHT/DARK MODE
-# =========================================================
-st.markdown("""
-<style>
-    /* Estilos para a tabela que funcionam em light/dark mode */
-    .stDataFrame {
-        border: 1px solid var(--border-color);
-        border-radius: 8px;
-    }
+# Verificar se carregou
+if df.empty:
+    st.error("""
+    ❌ **Não foi possível carregar os dados**
     
-    /* Garantir contraste de texto */
-    .stDataFrame [data-testid="stDataFrame"] {
-        color: var(--text-color) !important;
-    }
+    **Possíveis causas:**
+    1. Credenciais da API não configuradas
+    2. Arquivo não encontrado no SharePoint
+    3. Permissões insuficientes
+    4. Aba '{SHEET_NAME}' não existe
+    """)
     
-    /* Headers da tabela */
-    .stDataFrame th {
-        background-color: var(--background-color) !important;
-        color: var(--text-color) !important;
-        font-weight: bold !important;
-    }
-    
-    /* Células da tabela */
-    .stDataFrame td {
-        color: var(--text-color) !important;
-        border-color: var(--border-color) !important;
-    }
-    
-    /* Linhas alternadas (zebra striping) */
-    .stDataFrame tr:nth-child(even) {
-        background-color: rgba(0, 0, 0, 0.02) !important;
-    }
-    
-    /* Hover nas linhas */
-    .stDataFrame tr:hover {
-        background-color: rgba(0, 0, 0, 0.05) !important;
-    }
-</style>
-""", unsafe_allow_html=True)
-
-# =========================================================
-# BOTÃO PARA ALTERNAR VISUALIZAÇÃO (OPCIONAL)
-# =========================================================
-with st.expander("⚙️ Configurações de visualização"):
-    col1, col2 = st.columns(2)
-    
-    with col1:
-        if st.button("🔄 Atualizar dados"):
-            st.cache_data.clear()
-            st.rerun()
-    
-    with col2:
-        st.info("""
-        **Dicas:**
-        - Clique nos cabeçalhos para ordenar
-        - Use Ctrl+F para buscar na tabela
-        - Role para ver todas as colunas
+    # Mostrar configuração necessária
+    with st.expander("🔧 Configuração necessária"):
+        st.markdown("""
+        ### 1. Configure as Secrets no Streamlit Cloud:
+        ```toml
+        MS_CLIENT_ID = "{seu-application-id}"
+        MS_CLIENT_SECRET = "{seu-secret-value}"
+        MS_TENANT_ID = "{seu-tenant-id}"
+        ```
+        
+        ### 2. Verifique no Azure AD:
+        - App tem permissão **Files.Read.All**
+        - **Admin Consent** foi dado
+        - Client secret está ativo
+        
+        ### 3. Verifique o Excel Online:
+        - Arquivo existe no link acima
+        - Aba se chama **"{SHEET_NAME}"**
+        - Você tem acesso ao arquivo
         """)
     
-    # Estatísticas rápidas
-    st.caption(f"📊 Mostrando {len(df_filtrado)} de {len(df)} registros")
+    # Fallback: Upload manual
+    st.warning("⚠️ Enquanto isso, use upload manual:")
+    uploaded_file = st.file_uploader("📤 Upload do Excel", type=["xlsx"])
+    
+    if uploaded_file:
+        try:
+            df = pd.read_excel(uploaded_file, sheet_name=SHEET_NAME, engine='openpyxl')
+            st.success("✅ Dados carregados manualmente")
+        except:
+            df = pd.read_excel(uploaded_file, engine='openpyxl')
+            st.warning("⚠️ Usando primeira aba do arquivo")
+    else:
+        st.stop()
+
+# =========================================================
+# 5. SEU PROCESSAMENTO ORIGINAL (MANTENHA SEU CÓDIGO AQUI!)
+# =========================================================
+# COLE TODO O SEU CÓDIGO DE PROCESSAMENTO A PARTIR DAQUI
+
+# Exemplo do SEU tratamento (substitua pelo seu real):
+if "Prazo em dias" in df.columns:
+    df["Prazo em dias"] = df["Prazo em dias"].astype(str).str.strip()
+    
+    df["Situação do Prazo"] = df["Prazo em dias"].apply(
+        lambda x: "Prazo encerrado" if "encerrado" in x.lower() else "Em prazo"
+    )
+    
+    df["Prazo em dias"] = pd.to_numeric(df["Prazo em dias"], errors="coerce")
+
+# ... Continue com TODO o seu código restante ...
+
+# =========================================================
+# 6. RODAPÉ COM INFORMAÇÕES
+# =========================================================
+st.divider()
+
+col1, col2, col3 = st.columns(3)
+
+with col1:
+    st.caption(f"📅 {datetime.now().strftime('%d/%m/%Y %H:%M')}")
+
+with col2:
+    st.caption("🔄 Atualização automática a cada 5min")
+
+with col3:
+    st.caption(f"📊 {len(df)} registros | Aba: {SHEET_NAME}")
+
+# =========================================================
+# 7. CONFIGURAÇÃO DAS SECRETS (instruções)
+# =========================================================
+with st.sidebar.expander("⚙️ Configurar Secrets", expanded=False):
+    st.markdown("""
+    ### No Streamlit Cloud:
+    
+    1. Vá em **Settings**
+    2. Clique em **Secrets**
+    3. Cole:
+    ```toml
+    MS_CLIENT_ID = "seu-application-id"
+    MS_CLIENT_SECRET = "seu-secret-value"
+    MS_TENANT_ID = "seu-tenant-id"
+    ```
+    
+    ### Como obter:
+    - **MS_CLIENT_ID**: Application ID do Azure AD
+    - **MS_CLIENT_SECRET**: VALUE do client secret
+    - **MS_TENANT_ID**: Directory ID do Azure AD
+    """)
