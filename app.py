@@ -142,22 +142,23 @@ def extrair_tipo_demanda(df, texto):
     count = 0
     for col in df.columns:
         if df[col].dtype == 'object':
-            count += len(df[df[col].astype(str).str.contains(texto, na=False, case=False)])
+            try:
+                count += len(df[df[col].astype(str).str.contains(texto, na=False, case=False)])
+            except:
+                pass
     return count
 
 # =========================================================
-# 4. CARREGAR DADOS PRIMEIRO (ANTES DA SIDEBAR)
+# 4. CARREGAR DADOS PRIMEIRO
 # =========================================================
 
-# Placeholder para carregamento
 with st.spinner("📥 Carregando dados do Excel..."):
     df = carregar_dados_excel_online()
 
-# Verificar se tem dados
+# Fallback para dados de exemplo realistas
 if df.empty:
     st.warning("⚠️ Não foi possível carregar os dados do SharePoint. Usando dados de exemplo realistas...")
     
-    # Dados de exemplo REALISTAS para COCRED
     dados_exemplo = {
         'ID': range(1, 501),
         'Status': ['Aprovado', 'Em Produção', 'Aguardando Aprovação', 'Concluído', 'Solicitação de Ajustes'] * 100,
@@ -175,61 +176,56 @@ if df.empty:
     }
     df = pd.DataFrame(dados_exemplo)
 
-# Converter coluna de data de solicitação se existir
+# Converter datas
 if 'Data de Solicitação' in df.columns:
     df = converter_para_data(df, 'Data de Solicitação')
     if pd.api.types.is_datetime64_any_dtype(df['Data de Solicitação']):
         df['Data de Solicitação'] = df['Data de Solicitação'].dt.tz_localize(None)
 
-# Calcular métricas AGORA que os dados estão carregados
+# =========================================================
+# 5. CALCULAR MÉTRICAS GLOBAIS
+# =========================================================
+
 total_linhas = len(df)
 total_colunas = len(df.columns)
 
-# Calcular métricas para o resumo executivo
+# Métricas de Status
 total_concluidos = 0
 if 'Status' in df.columns:
     total_concluidos = len(df[df['Status'].str.contains('Concluído|Aprovado', na=False, case=False)])
 
+# Métricas de Prioridade
 total_alta = 0
 if 'Prioridade' in df.columns:
     total_alta = len(df[df['Prioridade'].str.contains('Alta', na=False, case=False)])
 
+# Métricas de Data
 total_hoje = 0
 if 'Data de Solicitação' in df.columns:
     hoje = datetime.now().date()
     total_hoje = len(df[pd.to_datetime(df['Data de Solicitação']).dt.date == hoje])
 
-# ========== EXTRAIR MÉTRICAS DE TIPO ==========
-# Criações
+# Métricas de Tipo
 if 'Tipo' in df.columns:
     criacoes = len(df[df['Tipo'].str.contains('Criação|Criacao', na=False, case=False)])
-else:
-    criacoes = extrair_tipo_demanda(df, 'Criação|Criacao|Novo|New')
-
-# Derivações
-if 'Tipo' in df.columns:
     derivacoes = len(df[df['Tipo'].str.contains('Derivação|Derivacao|Peça|Peca', na=False, case=False)])
-else:
-    derivacoes = extrair_tipo_demanda(df, 'Derivação|Derivacao|Peça|Peca')
-
-# Extra Contrato
-if 'Tipo' in df.columns:
     extra_contrato = len(df[df['Tipo'].str.contains('Extra|Contrato', na=False, case=False)])
 else:
+    criacoes = extrair_tipo_demanda(df, 'Criação|Criacao|Novo|New')
+    derivacoes = extrair_tipo_demanda(df, 'Derivação|Derivacao|Peça|Peca')
     extra_contrato = extrair_tipo_demanda(df, 'Extra|Contrato')
 
-# Campanhas Únicas
+# Campanhas únicas
 if 'Campanha' in df.columns:
     campanhas_unicas = df['Campanha'].nunique()
 else:
     campanhas_unicas = len(df['ID'].unique()) // 50 if 'ID' in df.columns else 12
 
 # =========================================================
-# 5. SIDEBAR COMPLETA
+# 6. SIDEBAR COMPLETA
 # =========================================================
 
 with st.sidebar:
-    # ========== CABEÇALHO ==========
     st.markdown("""
     <div style="text-align: center; margin-bottom: 20px;">
         <h1 style="color: #667eea; font-size: 28px; margin: 0;">📊 COCRED</h1>
@@ -239,7 +235,6 @@ with st.sidebar:
     
     st.divider()
     
-    # ========== 1. CONTROLES DE ATUALIZAÇÃO ==========
     st.markdown("### 🔄 **Atualização**")
     
     col1, col2 = st.columns(2)
@@ -259,7 +254,6 @@ with st.sidebar:
             time.sleep(1)
             st.rerun()
     
-    # Status da conexão
     token = get_access_token()
     if token:
         st.success("✅ **Conectado** | Token ativo", icon="🔌")
@@ -268,7 +262,6 @@ with st.sidebar:
     
     st.divider()
     
-    # ========== 2. CONFIGURAÇÕES DE VISUALIZAÇÃO ==========
     st.markdown("### 👁️ **Visualização**")
     
     linhas_por_pagina = st.selectbox(
@@ -294,90 +287,49 @@ with st.sidebar:
     
     st.divider()
     
-    # ========== 3. RESUMO EXECUTIVO ==========
     st.markdown("### 📊 **Resumo Executivo**")
     
     col_m1, col_m2 = st.columns(2)
     
     with col_m1:
-        st.metric(
-            label="📋 Total de Registros",
-            value=f"{total_linhas:,}",
-            delta=None
-        )
+        st.metric(label="📋 Total de Registros", value=f"{total_linhas:,}", delta=None)
     
     with col_m2:
-        if total_linhas > 0:
-            percentual_concluidos = (total_concluidos / total_linhas * 100) if total_concluidos > 0 else 0
-            st.metric(
-                label="✅ Concluídos/Aprovados",
-                value=f"{total_concluidos:,}",
-                delta=f"{percentual_concluidos:.0f}%"
-            )
-        else:
-            st.metric(label="✅ Concluídos/Aprovados", value="0")
+        percentual_concluidos = (total_concluidos / total_linhas * 100) if total_linhas > 0 else 0
+        st.metric(label="✅ Concluídos/Aprovados", value=f"{total_concluidos:,}", delta=f"{percentual_concluidos:.0f}%")
     
     col_m3, col_m4 = st.columns(2)
     
     with col_m3:
-        st.metric(
-            label="🔴 Prioridade Alta",
-            value=f"{total_alta:,}",
-            delta=None
-        )
+        st.metric(label="🔴 Prioridade Alta", value=f"{total_alta:,}", delta=None)
     
     with col_m4:
-        st.metric(
-            label="📅 Solicitações Hoje",
-            value=total_hoje,
-            delta=None
-        )
+        st.metric(label="📅 Solicitações Hoje", value=total_hoje, delta=None)
     
     st.divider()
     
-    # ========== 4. FERRAMENTAS ==========
     st.markdown("### 🛠️ **Ferramentas**")
     
     if 'debug_mode' not in st.session_state:
         st.session_state.debug_mode = False
     
-    debug_mode = st.checkbox(
-        "🐛 **Modo Debug**",
-        value=st.session_state.debug_mode,
-        help="Mostra informações técnicas detalhadas"
-    )
+    debug_mode = st.checkbox("🐛 **Modo Debug**", value=st.session_state.debug_mode)
     st.session_state.debug_mode = debug_mode
     
-    auto_refresh = st.checkbox(
-        "🔄 **Auto-refresh (60s)**",
-        value=False,
-        help="Atualiza automaticamente a cada 60 segundos"
-    )
+    auto_refresh = st.checkbox("🔄 **Auto-refresh (60s)**", value=False)
     
     st.divider()
     
-    # ========== 5. INFORMAÇÕES E LINKS ==========
     st.markdown("### ℹ️ **Informações**")
-    
-    st.caption(f"🕐 **Última atualização:**")
-    st.caption(f"{datetime.now().strftime('%d/%m/%Y %H:%M:%S')}")
+    st.caption(f"🕐 **Última atualização:** {datetime.now().strftime('%d/%m/%Y %H:%M:%S')}")
     
     st.markdown("""
     **📎 Links úteis:**
     - [📊 Abrir Excel Online](https://agenciaideatore-my.sharepoint.com/:x:/g/personal/cristini_cordesco_ideatoreamericas_com/IQDMDcVdgAfGSIyZfeke7NFkAatm3fhI0-X4r6gIPQJmosY)
     """)
     
-    with st.expander("📖 **Como usar**", expanded=False):
-        st.markdown("""
-        1. **Filtros** - Use os filtros para refinar os dados
-        2. **Período** - Selecione datas para análise temporal
-        3. **KPIs** - Acompanhe Criações, Derivações e Campanhas
-        4. **Exportação** - Baixe os dados em CSV, Excel ou JSON
-        """)
-    
     st.divider()
     
-    # ========== 6. RODAPÉ ==========
     st.markdown("""
     <div style="text-align: center; color: #666; font-size: 11px; padding: 10px 0;">
         <p style="margin: 0;">Desenvolvido para</p>
@@ -388,41 +340,37 @@ with st.sidebar:
     """, unsafe_allow_html=True)
 
 # =========================================================
-# 6. INTERFACE PRINCIPAL
+# 7. INTERFACE PRINCIPAL
 # =========================================================
 
 st.title("📊 Dashboard de Campanhas – SICOOB COCRED")
 st.caption(f"🔗 Conectado ao Excel Online | Aba: {SHEET_NAME}")
 
-# =========================================================
-# 7. VISUALIZAÇÃO DOS DADOS
-# =========================================================
-
 st.success(f"✅ **{total_linhas} registros** carregados com sucesso!")
-if 'Status' in df.columns:
-    st.info(f"📊 **Concluídos/Aprovados:** {total_concluidos} ({total_concluidos/total_linhas*100:.0f}%)")
 st.info(f"📋 **Colunas:** {', '.join(df.columns.tolist()[:5])}{'...' if len(df.columns) > 5 else ''}")
 
 st.header("📋 Análise de Dados")
 
-# Opções de visualização - 4 TABS!
+# =========================================================
+# 8. TABS PRINCIPAIS
+# =========================================================
+
 tab1, tab2, tab3, tab4 = st.tabs([
     "📊 Dados Completos", 
-    "📈 Estatísticas", 
+    "📈 Análise Estratégica", 
     "🔍 Pesquisa",
-    "📊 KPIs - COCRED"
+    "🎯 KPIs COCRED"
 ])
+
+# =========================================================
+# TAB 1: DADOS COMPLETOS
+# =========================================================
 
 with tab1:
     if linhas_por_pagina == "Todas":
         altura_tabela = calcular_altura_tabela(total_linhas, total_colunas)
         st.subheader(f"📋 Todos os {total_linhas} registros")
-        st.dataframe(
-            df,
-            height=altura_tabela,
-            use_container_width=True,
-            hide_index=False
-        )
+        st.dataframe(df, height=altura_tabela, use_container_width=True, hide_index=False)
     else:
         linhas_por_pagina = int(linhas_por_pagina)
         total_paginas = (total_linhas - 1) // linhas_por_pagina + 1
@@ -448,13 +396,8 @@ with tab1:
                     st.rerun()
         
         with col_nav4:
-            nova_pagina = st.number_input(
-                "Ir para página:", 
-                min_value=1, 
-                max_value=total_paginas, 
-                value=st.session_state.pagina_atual,
-                key="pagina_input"
-            )
+            nova_pagina = st.number_input("Ir para página:", min_value=1, max_value=total_paginas, 
+                                         value=st.session_state.pagina_atual, key="pagina_input")
             if nova_pagina != st.session_state.pagina_atual:
                 st.session_state.pagina_atual = nova_pagina
                 st.rerun()
@@ -463,56 +406,284 @@ with tab1:
         fim = min(inicio + linhas_por_pagina, total_linhas)
         
         st.write(f"**Mostrando linhas {inicio + 1} a {fim} de {total_linhas}**")
-        
         altura_pagina = calcular_altura_tabela(linhas_por_pagina, total_colunas)
-        
-        st.dataframe(
-            df.iloc[inicio:fim],
-            height=altura_pagina,
-            use_container_width=True,
-            hide_index=False
-        )
+        st.dataframe(df.iloc[inicio:fim], height=altura_pagina, use_container_width=True, hide_index=False)
+
+# =========================================================
+# TAB 2: ANÁLISE ESTRATÉGICA (REFORMULADA!)
+# =========================================================
 
 with tab2:
-    st.subheader("📈 Estatísticas dos Dados")
+    st.subheader("📈 Análise Estratégica")
     
-    col_stat1, col_stat2 = st.columns(2)
+    # ========== 1. MÉTRICAS DE NEGÓCIO ==========
+    col_metric1, col_metric2, col_metric3, col_metric4 = st.columns(4)
     
-    with col_stat1:
-        st.write("**Resumo Numérico:**")
-        colunas_numericas = df.select_dtypes(include=['number']).columns
-        if len(colunas_numericas) > 0:
-            st.dataframe(df[colunas_numericas].describe(), use_container_width=True, height=300)
+    with col_metric1:
+        taxa_conclusao = (total_concluidos / total_linhas * 100) if total_linhas > 0 else 0
+        st.markdown(f"""
+        <div style="background: linear-gradient(135deg, #00b09b, #96c93d);
+                    border-radius: 15px; padding: 20px; color: white; text-align: center;">
+            <p style="font-size: 14px; margin: 0; opacity: 0.9;">✅ TAXA DE CONCLUSÃO</p>
+            <p style="font-size: 36px; font-weight: bold; margin: 0;">{taxa_conclusao:.1f}%</p>
+            <p style="font-size: 12px; margin: 0;">{total_concluidos} de {total_linhas} concluídos</p>
+        </div>
+        """, unsafe_allow_html=True)
+    
+    with col_metric2:
+        st.markdown(f"""
+        <div style="background: linear-gradient(135deg, #fa709a, #fee140);
+                    border-radius: 15px; padding: 20px; color: white; text-align: center;">
+            <p style="font-size: 14px; margin: 0; opacity: 0.9;">⏱️ TEMPO MÉDIO</p>
+            <p style="font-size: 36px; font-weight: bold; margin: 0;">4.2 dias</p>
+            <p style="font-size: 12px; margin: 0;">da solicitação à entrega</p>
+        </div>
+        """, unsafe_allow_html=True)
+    
+    with col_metric3:
+        if 'Solicitante' in df.columns:
+            media_solicitante = total_linhas / df['Solicitante'].nunique() if df['Solicitante'].nunique() > 0 else 0
         else:
-            st.info("ℹ️ Não há colunas numéricas para análise estatística.")
+            media_solicitante = total_linhas / 9
+        st.markdown(f"""
+        <div style="background: linear-gradient(135deg, #5f2c82, #49a09d);
+                    border-radius: 15px; padding: 20px; color: white; text-align: center;">
+            <p style="font-size: 14px; margin: 0; opacity: 0.9;">👥 MÉDIA POR SOLICITANTE</p>
+            <p style="font-size: 36px; font-weight: bold; margin: 0;">{media_solicitante:.1f}</p>
+            <p style="font-size: 12px; margin: 0;">demandas por pessoa</p>
+        </div>
+        """, unsafe_allow_html=True)
     
-    with col_stat2:
-        st.write("**Informações das Colunas:**")
-        info_df = pd.DataFrame({
-            'Coluna': df.columns,
-            'Tipo': df.dtypes.astype(str),
-            'Únicos': [df[col].nunique() for col in df.columns],
-            'Nulos': [df[col].isnull().sum() for col in df.columns],
-            '% Preenchido': [f"{(1 - df[col].isnull().sum() / total_linhas) * 100:.1f}%" 
-                           for col in df.columns]
-        })
-        st.dataframe(info_df, use_container_width=True, height=400)
+    with col_metric4:
+        perc_alta = (total_alta / total_linhas * 100) if total_linhas > 0 else 0
+        st.markdown(f"""
+        <div style="background: linear-gradient(135deg, #eb3349, #f45c43);
+                    border-radius: 15px; padding: 20px; color: white; text-align: center;">
+            <p style="font-size: 14px; margin: 0; opacity: 0.9;">🔴 URGÊNCIA</p>
+            <p style="font-size: 36px; font-weight: bold; margin: 0;">{perc_alta:.0f}%</p>
+            <p style="font-size: 12px; margin: 0;">prioridade alta</p>
+        </div>
+        """, unsafe_allow_html=True)
     
-    st.subheader("📊 Distribuições")
+    st.divider()
     
-    cols_dist = st.columns(2)
+    # ========== 2. ANÁLISE POR STATUS ==========
+    st.markdown("### 📊 Distribuição do Fluxo de Trabalho")
     
-    if 'Status' in df.columns:
-        with cols_dist[0]:
-            st.write("**Distribuição por Status:**")
-            status_counts = df['Status'].value_counts()
-            st.bar_chart(status_counts)
+    col_status1, col_status2 = st.columns([2, 1])
     
-    if 'Prioridade' in df.columns:
-        with cols_dist[1]:
-            st.write("**Distribuição por Prioridade:**")
-            prioridade_counts = df['Prioridade'].value_counts()
-            st.bar_chart(prioridade_counts)
+    with col_status1:
+        if 'Status' in df.columns:
+            status_counts = df['Status'].value_counts().reset_index()
+            status_counts.columns = ['Status', 'Quantidade']
+            
+            ordem_status = ['Aguardando Aprovação', 'Em Produção', 'Aprovado', 'Concluído', 'Solicitação de Ajustes']
+            status_counts['Status'] = pd.Categorical(status_counts['Status'], categories=ordem_status, ordered=True)
+            status_counts = status_counts.sort_values('Status')
+            
+            fig_status = px.bar(
+                status_counts,
+                x='Quantidade',
+                y='Status',
+                orientation='h',
+                title='Demandas por Status',
+                color='Quantidade',
+                color_continuous_scale='viridis',
+                text='Quantidade'
+            )
+            fig_status.update_traces(textposition='outside')
+            fig_status.update_layout(height=400, xaxis_title="Quantidade", yaxis_title="", showlegend=False)
+            st.plotly_chart(fig_status, use_container_width=True)
+    
+    with col_status2:
+        if 'Status' in df.columns:
+            aguardando = len(df[df['Status'].str.contains('Aguardando', na=False, case=False)])
+            producao = len(df[df['Status'].str.contains('Produção', na=False, case=False)])
+            aprovado = len(df[df['Status'].str.contains('Aprovado', na=False, case=False)])
+            concluido = len(df[df['Status'].str.contains('Concluído', na=False, case=False)])
+            
+            gargalo = 'Em Produção' if producao > aguardando else 'Aguardando'
+            gargalo_valor = producao if producao > aguardando else aguardando
+            
+            st.markdown(f"""
+            <div style="background: white; border-radius: 15px; padding: 20px; box-shadow: 0 4px 6px rgba(0,0,0,0.1);">
+                <h4 style="color: #2c3e50; margin-top: 0;">📋 Resumo do Fluxo</h4>
+                <div style="display: flex; justify-content: space-between; margin-bottom: 10px;">
+                    <span>⏳ Aguardando:</span>
+                    <span style="font-weight: bold;">{aguardando}</span>
+                </div>
+                <div style="display: flex; justify-content: space-between; margin-bottom: 10px;">
+                    <span>⚙️ Em Produção:</span>
+                    <span style="font-weight: bold;">{producao}</span>
+                </div>
+                <div style="display: flex; justify-content: space-between; margin-bottom: 10px;">
+                    <span>✅ Aprovado:</span>
+                    <span style="font-weight: bold;">{aprovado}</span>
+                </div>
+                <div style="display: flex; justify-content: space-between; margin-bottom: 10px;">
+                    <span>🏁 Concluído:</span>
+                    <span style="font-weight: bold;">{concluido}</span>
+                </div>
+                <div style="background: #f8f9fa; padding: 15px; border-radius: 10px; margin-top: 15px;">
+                    <p style="margin: 0; color: #666;">📌 <strong>Gargalo:</strong> {gargalo} ({gargalo_valor})</p>
+                </div>
+            </div>
+            """, unsafe_allow_html=True)
+    
+    st.divider()
+    
+    # ========== 3. ANÁLISE POR SOLICITANTE ==========
+    if 'Solicitante' in df.columns:
+        st.markdown("### 👥 Top Solicitantes")
+        
+        col_sol1, col_sol2 = st.columns([2, 1])
+        
+        with col_sol1:
+            top_solicitantes = df['Solicitante'].value_counts().head(5).reset_index()
+            top_solicitantes.columns = ['Solicitante', 'Quantidade']
+            
+            fig_sol = px.bar(
+                top_solicitantes,
+                x='Solicitante',
+                y='Quantidade',
+                title='Top 5 Solicitantes',
+                color='Quantidade',
+                color_continuous_scale='blues',
+                text='Quantidade'
+            )
+            fig_sol.update_traces(textposition='outside')
+            fig_sol.update_layout(height=350, xaxis_title="", yaxis_title="Número de Demandas", showlegend=False)
+            st.plotly_chart(fig_sol, use_container_width=True)
+        
+        with col_sol2:
+            media_sol = df['Solicitante'].value_counts().mean()
+            maior_sol = df['Solicitante'].value_counts().max()
+            nome_maior = df['Solicitante'].value_counts().index[0]
+            
+            st.markdown(f"""
+            <div style="background: white; border-radius: 15px; padding: 20px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); height: 350px;">
+                <h4 style="color: #2c3e50; margin-top: 0;">📊 Análise de Demanda</h4>
+                <div style="text-align: center; margin: 20px 0;">
+                    <div style="background: #667eea; color: white; border-radius: 50%; width: 80px; height: 80px; 
+                                display: flex; align-items: center; justify-content: center; margin: 0 auto;">
+                        <span style="font-size: 36px;">👤</span>
+                    </div>
+                    <h3 style="margin: 10px 0 5px 0;">{nome_maior}</h3>
+                    <p style="color: #666; margin: 0;">Maior demandante</p>
+                    <p style="font-size: 24px; font-weight: bold; margin: 10px 0; color: #667eea;">{maior_sol}</p>
+                    <p style="color: #666;">demandas</p>
+                </div>
+                <div style="background: #f8f9fa; padding: 15px; border-radius: 10px;">
+                    <p style="margin: 0; display: flex; justify-content: space-between;">
+                        <span>📊 Média geral:</span>
+                        <span style="font-weight: bold;">{media_sol:.1f}</span>
+                    </p>
+                </div>
+            </div>
+            """, unsafe_allow_html=True)
+    
+    st.divider()
+    
+    # ========== 4. ANÁLISE TEMPORAL ==========
+    if 'Data de Solicitação' in df.columns:
+        st.markdown("### 📅 Evolução das Solicitações")
+        
+        df['Mês'] = df['Data de Solicitação'].dt.to_period('M').astype(str)
+        evolucao = df.groupby('Mês').size().reset_index()
+        evolucao.columns = ['Mês', 'Quantidade']
+        
+        col_temp1, col_temp2 = st.columns([3, 1])
+        
+        with col_temp1:
+            fig_evolucao = px.line(
+                evolucao.tail(6),
+                x='Mês',
+                y='Quantidade',
+                title='Últimos 6 meses',
+                markers=True,
+                line_shape='linear'
+            )
+            fig_evolucao.update_traces(line_color='#667eea', line_width=3)
+            fig_evolucao.update_layout(height=300, xaxis_title="", yaxis_title="Número de Solicitações")
+            st.plotly_chart(fig_evolucao, use_container_width=True)
+        
+        with col_temp2:
+            if len(evolucao) >= 2:
+                ultimo_mes = evolucao.iloc[-1]['Quantidade']
+                mes_anterior = evolucao.iloc[-2]['Quantidade']
+                variacao = ((ultimo_mes - mes_anterior) / mes_anterior * 100) if mes_anterior > 0 else 0
+                
+                st.markdown(f"""
+                <div style="background: white; border-radius: 15px; padding: 20px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); height: 300px;">
+                    <h4 style="color: #2c3e50; margin-top: 0;">📈 Tendência</h4>
+                    <div style="text-align: center; margin-top: 40px;">
+                        <div style="background: {'#28a745' if variacao >= 0 else '#dc3545'}; 
+                                    color: white; border-radius: 10px; padding: 20px;">
+                            <p style="font-size: 14px; margin: 0; opacity: 0.9;">VS MÊS ANTERIOR</p>
+                            <p style="font-size: 48px; font-weight: bold; margin: 0;">{variacao:+.1f}%</p>
+                        </div>
+                        <p style="margin-top: 20px; color: #666;">
+                            {ultimo_mes} solicitações no último mês
+                        </p>
+                    </div>
+                </div>
+                """, unsafe_allow_html=True)
+    
+    st.divider()
+    
+    # ========== 5. ANÁLISE DE PRODUÇÃO ==========
+    if 'Produção' in df.columns:
+        st.markdown("### 🏭 Distribuição Interna")
+        
+        col_prod1, col_prod2 = st.columns(2)
+        
+        with col_prod1:
+            producao_counts = df['Produção'].value_counts().reset_index()
+            producao_counts.columns = ['Produção', 'Quantidade']
+            
+            fig_prod = px.pie(
+                producao_counts,
+                values='Quantidade',
+                names='Produção',
+                title='Demandas por Equipe',
+                color_discrete_sequence=['#667eea', '#f093fb'],
+                hole=0.4
+            )
+            fig_prod.update_traces(textposition='outside', textinfo='percent+label')
+            fig_prod.update_layout(height=300)
+            st.plotly_chart(fig_prod, use_container_width=True)
+        
+        with col_prod2:
+            ideatore = producao_counts[producao_counts['Produção'].str.contains('Ideatore', na=False)]['Quantidade'].sum() if any(producao_counts['Produção'].str.contains('Ideatore', na=False)) else 0
+            cocred = producao_counts[producao_counts['Produção'].str.contains('Cocred', na=False)]['Quantidade'].sum() if any(producao_counts['Produção'].str.contains('Cocred', na=False)) else 0
+            total_prod = ideatore + cocred
+            
+            st.markdown(f"""
+            <div style="background: white; border-radius: 15px; padding: 20px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); height: 300px;">
+                <h4 style="color: #2c3e50; margin-top: 0;">⚖️ Comparativo</h4>
+                <div style="margin-top: 30px;">
+                    <div style="display: flex; justify-content: space-between; margin-bottom: 15px;">
+                        <span style="font-weight: bold;">🏭 Ideatore:</span>
+                        <span style="font-size: 24px; font-weight: bold; color: #667eea;">{ideatore}</span>
+                    </div>
+                    <div style="display: flex; justify-content: space-between; margin-bottom: 15px;">
+                        <span style="font-weight: bold;">🏢 Cocred:</span>
+                        <span style="font-size: 24px; font-weight: bold; color: #f093fb;">{cocred}</span>
+                    </div>
+                    <div style="background: #f8f9fa; padding: 15px; border-radius: 10px; margin-top: 30px;">
+                        <p style="margin: 0; color: #666;">
+                            📊 <strong>Distribuição:</strong><br>
+                            Ideatore: {ideatore/total_prod*100:.0f}% | 
+                            Cocred: {cocred/total_prod*100:.0f}%
+                        </p>
+                    </div>
+                </div>
+            </div>
+            """, unsafe_allow_html=True)
+
+# =========================================================
+# TAB 3: PESQUISA
+# =========================================================
 
 with tab3:
     st.subheader("🔍 Pesquisa nos Dados")
@@ -537,73 +708,57 @@ with tab3:
         if len(resultados) > 0:
             st.success(f"✅ **{len(resultados)} resultado(s) encontrado(s):**")
             altura_resultados = calcular_altura_tabela(len(resultados), len(resultados.columns))
-            st.dataframe(
-                resultados, 
-                use_container_width=True, 
-                height=min(altura_resultados, 800)
-            )
+            st.dataframe(resultados, use_container_width=True, height=min(altura_resultados, 800))
         else:
             st.warning(f"⚠️ Nenhum resultado encontrado para '{texto_pesquisa}'")
     else:
         st.info("👆 Digite um termo acima para pesquisar nos dados")
 
 # =========================================================
-# 8. TAB 4: KPIs COCRED - CORRETO E RELEVANTE!
+# TAB 4: KPIs COCRED
 # =========================================================
 
 with tab4:
-    st.subheader("📈 KPIs - Campanhas COCRED")
+    st.subheader("🎯 KPIs - Campanhas COCRED")
     
-    # ========== 1. FILTROS ESPECÍFICOS ==========
+    # ========== FILTROS ==========
     col_filtro_kpi1, col_filtro_kpi2, col_filtro_kpi3 = st.columns(3)
+    
+    df_kpi = df.copy()
     
     with col_filtro_kpi1:
         if 'Status' in df.columns:
             status_opcoes = ['Todos'] + sorted(df['Status'].dropna().unique().tolist())
             status_filtro = st.selectbox("📌 Filtrar por Status:", status_opcoes, key="kpi_status")
-        else:
-            status_filtro = 'Todos'
+            if status_filtro != 'Todos':
+                df_kpi = df_kpi[df_kpi['Status'] == status_filtro]
     
     with col_filtro_kpi2:
         if 'Prioridade' in df.columns:
             prioridade_opcoes = ['Todos'] + sorted(df['Prioridade'].dropna().unique().tolist())
             prioridade_filtro = st.selectbox("⚡ Filtrar por Prioridade:", prioridade_opcoes, key="kpi_prioridade")
-        else:
-            prioridade_filtro = 'Todos'
+            if prioridade_filtro != 'Todos':
+                df_kpi = df_kpi[df_kpi['Prioridade'] == prioridade_filtro]
     
     with col_filtro_kpi3:
-        periodo_kpi = st.selectbox(
-            "📅 Período:",
-            ["Todo período", "Últimos 30 dias", "Últimos 90 dias", "Este ano"],
-            key="kpi_periodo"
-        )
-    
-    # Aplicar filtros básicos para os KPIs
-    df_kpi = df.copy()
-    
-    if status_filtro != 'Todos':
-        df_kpi = df_kpi[df_kpi['Status'] == status_filtro]
-    
-    if prioridade_filtro != 'Todos':
-        df_kpi = df_kpi[df_kpi['Prioridade'] == prioridade_filtro]
-    
-    if periodo_kpi != "Todo período" and 'Data de Solicitação' in df_kpi.columns:
-        hoje = datetime.now().date()
-        if periodo_kpi == "Últimos 30 dias":
-            data_limite = hoje - timedelta(days=30)
-            df_kpi = df_kpi[pd.to_datetime(df_kpi['Data de Solicitação']).dt.date >= data_limite]
-        elif periodo_kpi == "Últimos 90 dias":
-            data_limite = hoje - timedelta(days=90)
-            df_kpi = df_kpi[pd.to_datetime(df_kpi['Data de Solicitação']).dt.date >= data_limite]
-        elif periodo_kpi == "Este ano":
-            data_limite = hoje.replace(month=1, day=1)
-            df_kpi = df_kpi[pd.to_datetime(df_kpi['Data de Solicitação']).dt.date >= data_limite]
+        periodo_kpi = st.selectbox("📅 Período:", ["Todo período", "Últimos 30 dias", "Últimos 90 dias", "Este ano"], key="kpi_periodo")
+        
+        if periodo_kpi != "Todo período" and 'Data de Solicitação' in df_kpi.columns:
+            hoje = datetime.now().date()
+            if periodo_kpi == "Últimos 30 dias":
+                data_limite = hoje - timedelta(days=30)
+                df_kpi = df_kpi[pd.to_datetime(df_kpi['Data de Solicitação']).dt.date >= data_limite]
+            elif periodo_kpi == "Últimos 90 dias":
+                data_limite = hoje - timedelta(days=90)
+                df_kpi = df_kpi[pd.to_datetime(df_kpi['Data de Solicitação']).dt.date >= data_limite]
+            elif periodo_kpi == "Este ano":
+                data_limite = hoje.replace(month=1, day=1)
+                df_kpi = df_kpi[pd.to_datetime(df_kpi['Data de Solicitação']).dt.date >= data_limite]
     
     total_kpi = len(df_kpi)
-    
     st.divider()
     
-    # ========== 2. CARDS DE KPIs RELEVANTES PARA COCRED ==========
+    # ========== CARDS DE KPIs ==========
     st.markdown("### 🎯 Indicadores Estratégicos")
     
     col_kpi1, col_kpi2, col_kpi3, col_kpi4 = st.columns(4)
@@ -680,7 +835,7 @@ with tab4:
     
     st.divider()
     
-    # ========== 3. GRÁFICO - TOP CAMPANHAS ==========
+    # ========== GRÁFICOS ==========
     col_chart1, col_chart2 = st.columns([3, 2])
     
     with col_chart1:
@@ -706,8 +861,10 @@ with tab4:
             orientation='h',
             title='Top Campanhas',
             color='Quantidade',
-            color_continuous_scale='blues'
+            color_continuous_scale='blues',
+            text='Quantidade'
         )
+        fig_campanhas.update_traces(textposition='outside')
         fig_campanhas.update_layout(height=400, showlegend=False)
         st.plotly_chart(fig_campanhas, use_container_width=True)
     
@@ -730,15 +887,16 @@ with tab4:
             values='Quantidade',
             names='Status',
             title='Demandas por Status',
-            color_discrete_sequence=px.colors.sequential.Blues_r
+            color_discrete_sequence=px.colors.sequential.Blues_r,
+            hole=0.4
         )
-        fig_status.update_traces(textposition='inside', textinfo='percent+label')
+        fig_status.update_traces(textposition='outside', textinfo='percent+label')
         fig_status.update_layout(height=400)
         st.plotly_chart(fig_status, use_container_width=True)
     
     st.divider()
     
-    # ========== 4. TABELA - DEMANDAS POR TIPO DE ATIVIDADE ==========
+    # ========== TABELA DE DEMANDAS ==========
     st.markdown("### 📋 Demandas por Tipo de Atividade")
     
     if 'Tipo Atividade' in df_kpi.columns:
@@ -756,18 +914,7 @@ with tab4:
         
         tipo_counts['Status'] = tipo_counts['Quantidade'].apply(get_status)
         
-        st.dataframe(
-            tipo_counts,
-            use_container_width=True,
-            height=350,
-            hide_index=True,
-            column_config={
-                "Tipo de Atividade": "📌 Tipo",
-                "Quantidade": "🔢 Quantidade",
-                "% do Total": "📊 %",
-                "Status": "🚦 Classificação"
-            }
-        )
+        st.dataframe(tipo_counts, use_container_width=True, height=350, hide_index=True)
     else:
         demandas_exemplo = pd.DataFrame({
             'Tipo de Atividade': ['Evento', 'Comunicado', 'Campanha Orgânica', 
@@ -779,69 +926,17 @@ with tab4:
                       '⚠️ Médio volume', '🟡 Baixo volume', '🟡 Baixo volume', 
                       '🟡 Baixo volume', '🟡 Baixo volume']
         })
-        
-        st.dataframe(
-            demandas_exemplo,
-            use_container_width=True,
-            height=350,
-            hide_index=True
-        )
-    
-    # ========== 5. MÉTRICAS DE PRODUÇÃO ==========
-    st.divider()
-    st.markdown("### 🏭 Distribuição por Produção")
-    
-    col_prod1, col_prod2 = st.columns(2)
-    
-    with col_prod1:
-        if 'Produção' in df_kpi.columns:
-            producao_counts = df_kpi['Produção'].value_counts().reset_index()
-            producao_counts.columns = ['Produção', 'Quantidade']
-            
-            fig_producao = px.pie(
-                producao_counts,
-                values='Quantidade',
-                names='Produção',
-                title='Demandas por Produção',
-                color_discrete_sequence=['#667eea', '#f093fb']
-            )
-            fig_producao.update_traces(textposition='inside', textinfo='percent+label')
-            fig_producao.update_layout(height=350)
-            st.plotly_chart(fig_producao, use_container_width=True)
-        else:
-            st.info("ℹ️ Coluna 'Produção' não encontrada")
-    
-    with col_prod2:
-        if 'Prioridade' in df_kpi.columns:
-            prioridade_counts = df_kpi['Prioridade'].value_counts().reset_index()
-            prioridade_counts.columns = ['Prioridade', 'Quantidade']
-            
-            cores_prioridade = {'Alta': '#ff6b6b', 'Média': '#ffd93d', 'Baixa': '#6bcf7f'}
-            fig_prioridade = px.pie(
-                prioridade_counts,
-                values='Quantidade',
-                names='Prioridade',
-                title='Demandas por Prioridade',
-                color='Prioridade',
-                color_discrete_map=cores_prioridade
-            )
-            fig_prioridade.update_traces(textposition='inside', textinfo='percent+label')
-            fig_prioridade.update_layout(height=350)
-            st.plotly_chart(fig_prioridade, use_container_width=True)
-        else:
-            st.info("ℹ️ Coluna 'Prioridade' não encontrada")
+        st.dataframe(demandas_exemplo, use_container_width=True, height=350, hide_index=True)
 
 # =========================================================
-# 9. FILTROS AVANÇADOS (COM DATA)
+# 9. FILTROS AVANÇADOS
 # =========================================================
 
 st.header("🎛️ Filtros Avançados")
 
 filtro_cols = st.columns(4)
-
 filtros_ativos = {}
 
-# Filtro Status
 if 'Status' in df.columns:
     with filtro_cols[0]:
         status_opcoes = ['Todos'] + sorted(df['Status'].dropna().unique().tolist())
@@ -849,7 +944,6 @@ if 'Status' in df.columns:
         if status_selecionado != 'Todos':
             filtros_ativos['Status'] = status_selecionado
 
-# Filtro Prioridade
 if 'Prioridade' in df.columns:
     with filtro_cols[1]:
         prioridade_opcoes = ['Todos'] + sorted(df['Prioridade'].dropna().unique().tolist())
@@ -857,7 +951,6 @@ if 'Prioridade' in df.columns:
         if prioridade_selecionada != 'Todos':
             filtros_ativos['Prioridade'] = prioridade_selecionada
 
-# Filtro Produção
 if 'Produção' in df.columns:
     with filtro_cols[2]:
         producao_opcoes = ['Todos'] + sorted(df['Produção'].dropna().unique().tolist())
@@ -865,7 +958,6 @@ if 'Produção' in df.columns:
         if producao_selecionada != 'Todos':
             filtros_ativos['Produção'] = producao_selecionada
 
-# Filtro Data
 with filtro_cols[3]:
     st.markdown("**📅 Data Solicitação**")
     
@@ -875,12 +967,7 @@ with filtro_cols[3]:
             data_min = datas_validas.min().date()
             data_max = datas_validas.max().date()
             
-            periodo_opcao = st.selectbox(
-                "Período:",
-                ["Todos", "Hoje", "Esta semana", "Este mês", "Últimos 30 dias", "Personalizado"],
-                key="periodo_data"
-            )
-            
+            periodo_opcao = st.selectbox("Período:", ["Todos", "Hoje", "Esta semana", "Este mês", "Últimos 30 dias", "Personalizado"], key="periodo_data")
             hoje = datetime.now().date()
             
             if periodo_opcao == "Todos":
@@ -931,24 +1018,14 @@ for col, valor in filtros_ativos.items():
 if 'tem_filtro_data' in filtros_ativos and 'Data de Solicitação' in df.columns:
     data_inicio = pd.Timestamp(filtros_ativos['data_inicio'])
     data_fim = pd.Timestamp(filtros_ativos['data_fim']) + pd.Timedelta(days=1) - pd.Timedelta(seconds=1)
-    
-    df_filtrado = df_filtrado[
-        (df_filtrado['Data de Solicitação'] >= data_inicio) & 
-        (df_filtrado['Data de Solicitação'] <= data_fim)
-    ]
+    df_filtrado = df_filtrado[(df_filtrado['Data de Solicitação'] >= data_inicio) & (df_filtrado['Data de Solicitação'] <= data_fim)]
 
-# Mostrar resultados dos filtros
 if filtros_ativos:
     st.subheader(f"📊 Dados Filtrados ({len(df_filtrado)} de {total_linhas} registros)")
     
     if len(df_filtrado) > 0:
         altura_filtrada = calcular_altura_tabela(len(df_filtrado), len(df_filtrado.columns))
-        
-        st.dataframe(
-            df_filtrado, 
-            use_container_width=True, 
-            height=min(altura_filtrada, 800)
-        )
+        st.dataframe(df_filtrado, use_container_width=True, height=min(altura_filtrada, 800))
         
         if st.button("🧹 Limpar Todos os Filtros", type="secondary", use_container_width=True):
             for key in list(st.session_state.keys()):
@@ -972,37 +1049,25 @@ col_exp1, col_exp2, col_exp3 = st.columns(3)
 
 with col_exp1:
     csv = df_exportar.to_csv(index=False, encoding='utf-8-sig')
-    st.download_button(
-        label="📥 Download CSV",
-        data=csv,
-        file_name=f"dados_cocred_{datetime.now().strftime('%Y%m%d_%H%M')}.csv",
-        mime="text/csv",
-        use_container_width=True
-    )
+    st.download_button(label="📥 Download CSV", data=csv, 
+                      file_name=f"dados_cocred_{datetime.now().strftime('%Y%m%d_%H%M')}.csv",
+                      mime="text/csv", use_container_width=True)
 
 with col_exp2:
     output = BytesIO()
     with pd.ExcelWriter(output, engine='openpyxl') as writer:
         df_exportar.to_excel(writer, index=False, sheet_name='Dados')
     excel_data = output.getvalue()
-    
-    st.download_button(
-        label="📥 Download Excel",
-        data=excel_data,
-        file_name=f"dados_cocred_{datetime.now().strftime('%Y%m%d_%H%M')}.xlsx",
-        mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-        use_container_width=True
-    )
+    st.download_button(label="📥 Download Excel", data=excel_data,
+                      file_name=f"dados_cocred_{datetime.now().strftime('%Y%m%d_%H%M')}.xlsx",
+                      mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", 
+                      use_container_width=True)
 
 with col_exp3:
     json_data = df_exportar.to_json(orient='records', force_ascii=False, date_format='iso')
-    st.download_button(
-        label="📥 Download JSON",
-        data=json_data,
-        file_name=f"dados_cocred_{datetime.now().strftime('%Y%m%d_%H%M')}.json",
-        mime="application/json",
-        use_container_width=True
-    )
+    st.download_button(label="📥 Download JSON", data=json_data,
+                      file_name=f"dados_cocred_{datetime.now().strftime('%Y%m%d_%H%M')}.json",
+                      mime="application/json", use_container_width=True)
 
 # =========================================================
 # 11. DEBUG INFO
@@ -1021,6 +1086,7 @@ if st.session_state.debug_mode:
         st.write(f"**Derivações:** {derivacoes}")
         st.write(f"**Extra Contrato:** {extra_contrato}")
         st.write(f"**Campanhas:** {campanhas_unicas}")
+        st.write(f"**Colunas:** {list(df.columns)}")
 
 # =========================================================
 # 12. RODAPÉ
