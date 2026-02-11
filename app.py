@@ -254,6 +254,8 @@ if df.empty:
         'Prioridade': ['Alta', 'Média', 'Baixa'] * 166 + ['Alta', 'Média'],
         'Produção': ['Cocred', 'Ideatore'] * 250,
         'Data de Solicitação': pd.date_range(start='2024-01-01', periods=500, freq='D'),
+        'Deadline': pd.date_range(start='2024-01-15', periods=500, freq='D'),
+        'Data de Entrega': pd.date_range(start='2024-01-20', periods=500, freq='D'),
         'Solicitante': ['Cassia Inoue', 'Laís Toledo', 'Nádia Zanin', 'Beatriz Russo', 'Thaís Gomes'] * 100,
         'Campanha': ['Campanha de Crédito Automático', 'Campanha de Consórcios', 'Campanha de Crédito PJ', 
                     'Campanha de Investimentos', 'Campanha de Conta Digital', 'Atualização de TVs internas'] * 83 + ['Campanha de Crédito Automático'] * 2,
@@ -266,10 +268,11 @@ if df.empty:
     df = pd.DataFrame(dados_exemplo)
 
 # Converter datas
-if 'Data de Solicitação' in df.columns:
-    df = converter_para_data(df, 'Data de Solicitação')
-    if pd.api.types.is_datetime64_any_dtype(df['Data de Solicitação']):
-        df['Data de Solicitação'] = df['Data de Solicitação'].dt.tz_localize(None)
+for col in ['Data de Solicitação', 'Deadline', 'Data de Entrega']:
+    if col in df.columns:
+        df = converter_para_data(df, col)
+        if pd.api.types.is_datetime64_any_dtype(df[col]):
+            df[col] = df[col].dt.tz_localize(None)
 
 # =========================================================
 # CALCULAR MÉTRICAS
@@ -412,7 +415,7 @@ with st.sidebar:
         <p style="margin: 0;">Desenvolvido para</p>
         <p style="margin: 0; font-weight: bold; color: #003366;">SICOOB COCRED</p>
         <p style="margin: 5px 0 0 0;">© 2026 - Ideatore</p>
-        <p style="margin: 5px 0 0 0;">v4.1.0</p>
+        <p style="margin: 5px 0 0 0;">v4.2.0</p>
     </div>
     """, unsafe_allow_html=True)
 
@@ -490,7 +493,7 @@ with tab1:
         st.dataframe(df.iloc[inicio:fim], height=altura_pagina, use_container_width=True, hide_index=False)
 
 # =========================================================
-# TAB 2: ANÁLISE ESTRATÉGICA (CORRIGIDO - SEM ERROS)
+# TAB 2: ANÁLISE ESTRATÉGICA
 # =========================================================
 with tab2:
     st.markdown("## 📈 Análise Estratégica")
@@ -567,7 +570,7 @@ with tab2:
     
     st.divider()
     
-    # ========== 2. ANÁLISE POR STATUS (CORRIGIDO) ==========
+    # ========== 2. ANÁLISE POR STATUS ==========
     st.markdown("""
     <div class="info-container-cocred">
         <p style="margin: 0; font-size: 14px;">
@@ -599,7 +602,6 @@ with tab2:
                 template=plotly_template
             )
             
-            # CORRIGIDO: textfont_color removido, usando texttemplate com cor condicional
             fig_status.update_traces(
                 textposition='outside',
                 texttemplate='%{text}',
@@ -654,7 +656,7 @@ with tab2:
     
     st.divider()
     
-    # ========== 3. ANÁLISE POR SOLICITANTE (CORRIGIDO) ==========
+    # ========== 3. ANÁLISE POR SOLICITANTE ==========
     if 'Solicitante' in df.columns:
         st.markdown("""
         <div class="info-container-cocred">
@@ -681,7 +683,6 @@ with tab2:
                 template=plotly_template
             )
             
-            # CORRIGIDO: textfont_color removido
             fig_sol.update_traces(
                 textposition='outside',
                 texttemplate='%{text}',
@@ -728,7 +729,7 @@ with tab2:
     
     st.divider()
     
-    # ========== 4. ANÁLISE TEMPORAL (CORRIGIDO) ==========
+    # ========== 4. ANÁLISE TEMPORAL ==========
     if 'Data de Solicitação' in df.columns:
         st.markdown("""
         <div class="info-container-cocred">
@@ -793,7 +794,7 @@ with tab2:
     
     st.divider()
     
-    # ========== 5. ANÁLISE DE PRODUÇÃO (CORRIGIDO) ==========
+    # ========== 5. ANÁLISE DE PRODUÇÃO ==========
     if 'Produção' in df.columns:
         st.markdown("""
         <div class="info-container-cocred">
@@ -820,7 +821,6 @@ with tab2:
                 hole=0.4
             )
             
-            # CORRIGIDO: textfont_color removido
             fig_prod.update_traces(
                 textposition='outside', 
                 textinfo='percent+label',
@@ -905,7 +905,7 @@ with tab3:
         st.info("👆 Digite um termo acima para pesquisar nos dados")
 
 # =========================================================
-# TAB 4: KPIs COCRED (CORRIGIDO)
+# TAB 4: KPIs COCRED
 # =========================================================
 with tab4:
     st.markdown("## 🎯 KPIs - Campanhas COCRED")
@@ -1050,7 +1050,7 @@ with tab4:
     
     st.divider()
     
-    # ========== GRÁFICOS (CORRIGIDOS) ==========
+    # ========== GRÁFICOS ==========
     col_chart1, col_chart2 = st.columns([3, 2])
     
     with col_chart1:
@@ -1087,7 +1087,6 @@ with tab4:
             template=plotly_template
         )
         
-        # CORRIGIDO: textfont_color removido
         fig_campanhas.update_traces(
             textposition='outside',
             texttemplate='%{text}',
@@ -1133,7 +1132,6 @@ with tab4:
             hole=0.4
         )
         
-        # CORRIGIDO: textfont_color removido
         fig_status.update_traces(
             textposition='outside', 
             textinfo='percent+label',
@@ -1209,13 +1207,15 @@ with tab4:
         st.dataframe(demandas_exemplo, use_container_width=True, height=350, hide_index=True)
 
 # =========================================================
-# FILTROS AVANÇADOS
+# FILTROS AVANÇADOS (COM DATA DE SOLICITAÇÃO E DEADLINE!)
 # =========================================================
 st.header("🎛️ Filtros Avançados")
 
-filtro_cols = st.columns(4)
+# Layout com 5 colunas para acomodar os 2 filtros de data
+filtro_cols = st.columns(5)
 filtros_ativos = {}
 
+# Coluna 1: Status
 if 'Status' in df.columns:
     with filtro_cols[0]:
         status_opcoes = ['Todos'] + sorted(df['Status'].dropna().unique().tolist())
@@ -1223,6 +1223,7 @@ if 'Status' in df.columns:
         if status_selecionado != 'Todos':
             filtros_ativos['Status'] = status_selecionado
 
+# Coluna 2: Prioridade
 if 'Prioridade' in df.columns:
     with filtro_cols[1]:
         prioridade_opcoes = ['Todos'] + sorted(df['Prioridade'].dropna().unique().tolist())
@@ -1230,6 +1231,7 @@ if 'Prioridade' in df.columns:
         if prioridade_selecionada != 'Todos':
             filtros_ativos['Prioridade'] = prioridade_selecionada
 
+# Coluna 3: Produção
 if 'Produção' in df.columns:
     with filtro_cols[2]:
         producao_opcoes = ['Todos'] + sorted(df['Produção'].dropna().unique().tolist())
@@ -1237,6 +1239,7 @@ if 'Produção' in df.columns:
         if producao_selecionada != 'Todos':
             filtros_ativos['Produção'] = producao_selecionada
 
+# ========== COLUNA 4: FILTRO DE DATA DE SOLICITAÇÃO ==========
 with filtro_cols[3]:
     st.markdown("**📅 Data Solicitação**")
     
@@ -1246,7 +1249,11 @@ with filtro_cols[3]:
             data_min = datas_validas.min().date()
             data_max = datas_validas.max().date()
             
-            periodo_opcao = st.selectbox("Período:", ["Todos", "Hoje", "Esta semana", "Este mês", "Últimos 30 dias", "Personalizado"], key="periodo_data")
+            periodo_opcao = st.selectbox(
+                "Período:", 
+                ["Todos", "Hoje", "Esta semana", "Este mês", "Últimos 30 dias", "Personalizado"], 
+                key="periodo_data"
+            )
             hoje = datetime.now().date()
             
             if periodo_opcao == "Todos":
@@ -1282,22 +1289,140 @@ with filtro_cols[3]:
                 filtros_ativos['data_fim'] = data_fim
                 filtros_ativos['tem_filtro_data'] = True
     else:
-        st.info("ℹ️ Sem coluna de data")
+        st.info("ℹ️ Indisponível")
+
+# ========== COLUNA 5: FILTRO DE DEADLINE (NOVO!) ==========
+with filtro_cols[4]:
+    st.markdown("**⏰ Deadline**")
+    
+    # Procurar por colunas de deadline/prazo
+    coluna_deadline = None
+    for col in df.columns:
+        if 'deadline' in col.lower() or 'prazo' in col.lower() or 'data entrega' in col.lower():
+            coluna_deadline = col
+            break
+    
+    if coluna_deadline is None and 'Deadline' in df.columns:
+        coluna_deadline = 'Deadline'
+    elif coluna_deadline is None and 'Prazo' in df.columns:
+        coluna_deadline = 'Prazo'
+    elif coluna_deadline is None and 'Data de Entrega' in df.columns:
+        coluna_deadline = 'Data de Entrega'
+    
+    if coluna_deadline:
+        # Garantir que é datetime
+        if not pd.api.types.is_datetime64_any_dtype(df[coluna_deadline]):
+            df[coluna_deadline] = pd.to_datetime(df[coluna_deadline], errors='coerce')
+        
+        datas_validas_deadline = df[coluna_deadline].dropna()
+        
+        if not datas_validas_deadline.empty:
+            data_min_deadline = datas_validas_deadline.min().date()
+            data_max_deadline = datas_validas_deadline.max().date()
+            
+            periodo_opcao_deadline = st.selectbox(
+                "Período:", 
+                ["Todos", "Hoje", "Esta semana", "Este mês", "Próximos 7 dias", "Próximos 30 dias", "Atrasados", "Personalizado"], 
+                key="periodo_deadline"
+            )
+            
+            hoje = datetime.now().date()
+            
+            if periodo_opcao_deadline == "Todos":
+                filtros_ativos['deadline_inicio'] = data_min_deadline
+                filtros_ativos['deadline_fim'] = data_max_deadline
+                filtros_ativos['tem_filtro_deadline'] = True
+                filtros_ativos['coluna_deadline'] = coluna_deadline
+                
+            elif periodo_opcao_deadline == "Hoje":
+                filtros_ativos['deadline_inicio'] = hoje
+                filtros_ativos['deadline_fim'] = hoje
+                filtros_ativos['tem_filtro_deadline'] = True
+                filtros_ativos['coluna_deadline'] = coluna_deadline
+                
+            elif periodo_opcao_deadline == "Esta semana":
+                inicio_semana = hoje - timedelta(days=hoje.weekday())
+                fim_semana = inicio_semana + timedelta(days=6)
+                filtros_ativos['deadline_inicio'] = inicio_semana
+                filtros_ativos['deadline_fim'] = fim_semana
+                filtros_ativos['tem_filtro_deadline'] = True
+                filtros_ativos['coluna_deadline'] = coluna_deadline
+                
+            elif periodo_opcao_deadline == "Este mês":
+                inicio_mes = hoje.replace(day=1)
+                ultimo_dia = (inicio_mes + timedelta(days=32)).replace(day=1) - timedelta(days=1)
+                filtros_ativos['deadline_inicio'] = inicio_mes
+                filtros_ativos['deadline_fim'] = ultimo_dia
+                filtros_ativos['tem_filtro_deadline'] = True
+                filtros_ativos['coluna_deadline'] = coluna_deadline
+                
+            elif periodo_opcao_deadline == "Próximos 7 dias":
+                filtros_ativos['deadline_inicio'] = hoje
+                filtros_ativos['deadline_fim'] = hoje + timedelta(days=7)
+                filtros_ativos['tem_filtro_deadline'] = True
+                filtros_ativos['coluna_deadline'] = coluna_deadline
+                
+            elif periodo_opcao_deadline == "Próximos 30 dias":
+                filtros_ativos['deadline_inicio'] = hoje
+                filtros_ativos['deadline_fim'] = hoje + timedelta(days=30)
+                filtros_ativos['tem_filtro_deadline'] = True
+                filtros_ativos['coluna_deadline'] = coluna_deadline
+                
+            elif periodo_opcao_deadline == "Atrasados":
+                filtros_ativos['deadline_inicio'] = data_min_deadline
+                filtros_ativos['deadline_fim'] = hoje - timedelta(days=1)
+                filtros_ativos['tem_filtro_deadline'] = True
+                filtros_ativos['coluna_deadline'] = coluna_deadline
+                
+            elif periodo_opcao_deadline == "Personalizado":
+                col1, col2 = st.columns(2)
+                with col1:
+                    data_ini_deadline = st.date_input("De", data_min_deadline, key="deadline_ini")
+                with col2:
+                    data_fim_deadline = st.date_input("Até", data_max_deadline, key="deadline_fim")
+                filtros_ativos['deadline_inicio'] = data_ini_deadline
+                filtros_ativos['deadline_fim'] = data_fim_deadline
+                filtros_ativos['tem_filtro_deadline'] = True
+                filtros_ativos['coluna_deadline'] = coluna_deadline
+        else:
+            st.info("ℹ️ Sem datas")
+    else:
+        st.info("ℹ️ Sem coluna")
 
 # =========================================================
 # APLICAR FILTROS
 # =========================================================
 df_filtrado = df.copy()
 
+# Aplicar filtros categóricos
 for col, valor in filtros_ativos.items():
-    if col not in ['data_inicio', 'data_fim', 'tem_filtro_data']:
+    if col not in ['data_inicio', 'data_fim', 'tem_filtro_data', 
+                   'deadline_inicio', 'deadline_fim', 'tem_filtro_deadline', 'coluna_deadline']:
         df_filtrado = df_filtrado[df_filtrado[col] == valor]
 
+# Aplicar filtro de data de solicitação
 if 'tem_filtro_data' in filtros_ativos and 'Data de Solicitação' in df.columns:
     data_inicio = pd.Timestamp(filtros_ativos['data_inicio'])
     data_fim = pd.Timestamp(filtros_ativos['data_fim']) + pd.Timedelta(days=1) - pd.Timedelta(seconds=1)
-    df_filtrado = df_filtrado[(df_filtrado['Data de Solicitação'] >= data_inicio) & (df_filtrado['Data de Solicitação'] <= data_fim)]
+    df_filtrado = df_filtrado[
+        (df_filtrado['Data de Solicitação'] >= data_inicio) & 
+        (df_filtrado['Data de Solicitação'] <= data_fim)
+    ]
 
+# Aplicar filtro de deadline
+if 'tem_filtro_deadline' in filtros_ativos and 'coluna_deadline' in filtros_ativos:
+    col_deadline = filtros_ativos['coluna_deadline']
+    if col_deadline in df_filtrado.columns:
+        deadline_inicio = pd.Timestamp(filtros_ativos['deadline_inicio'])
+        deadline_fim = pd.Timestamp(filtros_ativos['deadline_fim']) + pd.Timedelta(days=1) - pd.Timedelta(seconds=1)
+        df_filtrado = df_filtrado[
+            (df_filtrado[col_deadline] >= deadline_inicio) & 
+            (df_filtrado[col_deadline] <= deadline_fim)
+        ]
+
+# =========================================================
+# MOSTRAR RESULTADOS DOS FILTROS
+# =========================================================
 if filtros_ativos:
     st.subheader(f"📊 Dados Filtrados ({len(df_filtrado)} de {total_linhas} registros)")
     
@@ -1305,9 +1430,27 @@ if filtros_ativos:
         altura_filtrada = calcular_altura_tabela(len(df_filtrado), len(df_filtrado.columns))
         st.dataframe(df_filtrado, use_container_width=True, height=min(altura_filtrada, 800))
         
+        col_filtros_resumo1, col_filtros_resumo2, col_filtros_resumo3 = st.columns(3)
+        
+        with col_filtros_resumo1:
+            st.metric("📈 Registros Filtrados", len(df_filtrado))
+        
+        with col_filtros_resumo2:
+            porcentagem = (len(df_filtrado) / total_linhas * 100) if total_linhas > 0 else 0
+            st.metric("📊 % do Total", f"{porcentagem:.1f}%")
+        
+        with col_filtros_resumo3:
+            if 'tem_filtro_data' in filtros_ativos:
+                st.metric("📅 Solicitação", 
+                         f"{filtros_ativos['data_inicio'].strftime('%d/%m')} a {filtros_ativos['data_fim'].strftime('%d/%m')}")
+            elif 'tem_filtro_deadline' in filtros_ativos:
+                st.metric("⏰ Deadline", 
+                         f"{filtros_ativos['deadline_inicio'].strftime('%d/%m')} a {filtros_ativos['deadline_fim'].strftime('%d/%m')}")
+        
         if st.button("🧹 Limpar Todos os Filtros", type="secondary", use_container_width=True):
             for key in list(st.session_state.keys()):
-                if key.startswith('filtro_') or key in ['periodo_data', 'data_ini', 'data_fim']:
+                if key.startswith('filtro_') or key in ['periodo_data', 'data_ini', 'data_fim', 
+                                                        'periodo_deadline', 'deadline_ini', 'deadline_fim']:
                     del st.session_state[key]
             st.rerun()
     else:
@@ -1362,6 +1505,7 @@ if st.session_state.debug_mode:
         st.write(f"**Derivações:** {derivacoes}")
         st.write(f"**Extra Contrato:** {extra_contrato}")
         st.write(f"**Campanhas:** {campanhas_unicas}")
+        st.write(f"**Coluna Deadline:** {coluna_deadline if 'coluna_deadline' in locals() else 'Não encontrada'}")
         st.write(f"**Template Plotly:** {plotly_template}")
 
 # =========================================================
@@ -1381,7 +1525,7 @@ with footer_col3:
     st.markdown("""
     <div style="text-align: right;">
         <span style="color: #003366; font-weight: bold;">SICOOB COCRED</span> | 
-        <span style="color: #6C757D;">v4.1.0</span>
+        <span style="color: #6C757D;">v4.2.0</span>
     </div>
     """, unsafe_allow_html=True)
 
