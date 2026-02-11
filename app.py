@@ -8,9 +8,23 @@ import pytz
 import time
 
 # =========================================================
+# CONFIGURAÇÕES INICIAIS
+# =========================================================
+# Configurar pandas para mostrar TUDO
+pd.set_option('display.max_rows', None)
+pd.set_option('display.max_columns', None)
+pd.set_option('display.width', None)
+pd.set_option('display.max_colwidth', None)
+
+st.set_page_config(
+    page_title="Dashboard de Campanhas - SICOOB COCRED", 
+    layout="wide",
+    page_icon="📊"
+)
+
+# =========================================================
 # CONFIGURAÇÕES DA API
 # =========================================================
-st.set_page_config(page_title="Dashboard de Campanhas - SICOOB COCRED", layout="wide")
 
 # 1. CREDENCIAIS DA API
 MS_CLIENT_ID = st.secrets.get("MS_CLIENT_ID", "")
@@ -117,7 +131,24 @@ def carregar_dados_excel_online():
         return pd.DataFrame()
 
 # =========================================================
-# 3. INTERFACE PRINCIPAL
+# 3. FUNÇÕES AUXILIARES
+# =========================================================
+def calcular_altura_tabela(num_linhas, num_colunas):
+    """Calcula altura ideal para a tabela"""
+    altura_base = 150  # pixels para cabeçalhos e controles
+    altura_por_linha = 35  # pixels por linha
+    altura_por_coluna = 2  # pixels extras por coluna
+    
+    # Altura baseada no conteúdo
+    altura_conteudo = altura_base + (num_linhas * altura_por_linha) + (num_colunas * altura_por_coluna)
+    
+    # Limitar a um máximo razoável para performance
+    altura_maxima = 2000  # 2000px = ~53 linhas visíveis de uma vez
+    
+    return min(altura_conteudo, altura_maxima)
+
+# =========================================================
+# 4. INTERFACE PRINCIPAL
 # =========================================================
 
 # Título
@@ -132,6 +163,14 @@ if 'debug_mode' not in st.session_state:
     st.session_state.debug_mode = False
 
 st.session_state.debug_mode = st.sidebar.checkbox("🐛 Modo Debug", value=st.session_state.debug_mode)
+
+# Configurações de visualização
+st.sidebar.header("👁️ Visualização")
+linhas_por_pagina = st.sidebar.selectbox(
+    "Linhas por página:", 
+    ["50", "100", "200", "500", "Todas"],
+    index=1
+)
 
 # Botão de atualização FORÇADA
 if st.sidebar.button("🔄 ATUALIZAR AGORA (Forçar)", type="primary", use_container_width=True):
@@ -163,7 +202,7 @@ st.sidebar.markdown(f"""
 """)
 
 # =========================================================
-# 4. CARREGAR E MOSTRAR DADOS
+# 5. CARREGAR E MOSTRAR DADOS
 # =========================================================
 
 # Carregar dados
@@ -183,35 +222,105 @@ st.success(f"✅ **{total_linhas} registros** carregados com sucesso!")
 st.info(f"📋 **Colunas:** {', '.join(df.columns.tolist()[:5])}{'...' if len(df.columns) > 5 else ''}")
 
 # =========================================================
-# 5. VISUALIZAÇÃO COMPLETA DOS DADOS
+# 6. VISUALIZAÇÃO COMPLETA DOS DADOS (COM PAGINAÇÃO)
 # =========================================================
 
 st.header("📋 Dados Completos")
-
-# Configurar para mostrar TUDO
-pd.set_option('display.max_rows', None)
-pd.set_option('display.max_columns', None)
 
 # Opções de visualização
 tab1, tab2, tab3 = st.tabs(["📊 Dados Completos", "📈 Estatísticas", "🔍 Pesquisa"])
 
 with tab1:
-    # ALTURA DINÂMICA baseada no número de linhas
-    altura_tabela = min(800, 200 + (total_linhas * 25))
-    
-    st.subheader(f"Todos os {total_linhas} registros")
-    st.dataframe(df, height=altura_tabela, use_container_width=True)
+    if linhas_por_pagina == "Todas":
+        # Mostrar TODAS as linhas de uma vez
+        altura_tabela = calcular_altura_tabela(total_linhas, total_colunas)
+        
+        st.subheader(f"📋 Todos os {total_linhas} registros")
+        
+        # Mostrar dataframe completo
+        st.dataframe(
+            df,
+            height=altura_tabela,
+            use_container_width=True,
+            hide_index=False,
+            column_config=None
+        )
+        
+        if altura_tabela >= 2000:
+            linhas_visiveis = int((2000 - 150) / 35)
+            st.info(f"ℹ️ Mostrando {linhas_visiveis} de {total_linhas} linhas por vez. Use o scroll para navegar.")
+        
+    else:
+        # Paginação manual
+        linhas_por_pagina = int(linhas_por_pagina)
+        total_paginas = (total_linhas - 1) // linhas_por_pagina + 1
+        
+        # Inicializar página na session_state
+        if 'pagina_atual' not in st.session_state:
+            st.session_state.pagina_atual = 1
+        
+        # Controles de navegação
+        col_nav1, col_nav2, col_nav3, col_nav4 = st.columns([2, 1, 1, 2])
+        
+        with col_nav1:
+            st.write(f"**Página {st.session_state.pagina_atual} de {total_paginas}**")
+        
+        with col_nav2:
+            if st.session_state.pagina_atual > 1:
+                if st.button("⬅️ Anterior", use_container_width=True):
+                    st.session_state.pagina_atual -= 1
+                    st.rerun()
+        
+        with col_nav3:
+            if st.session_state.pagina_atual < total_paginas:
+                if st.button("Próxima ➡️", use_container_width=True):
+                    st.session_state.pagina_atual += 1
+                    st.rerun()
+        
+        with col_nav4:
+            # Seletor de página direto
+            nova_pagina = st.number_input(
+                "Ir para página:", 
+                min_value=1, 
+                max_value=total_paginas, 
+                value=st.session_state.pagina_atual,
+                key="pagina_input"
+            )
+            if nova_pagina != st.session_state.pagina_atual:
+                st.session_state.pagina_atual = nova_pagina
+                st.rerun()
+        
+        # Calcular índices
+        inicio = (st.session_state.pagina_atual - 1) * linhas_por_pagina
+        fim = min(inicio + linhas_por_pagina, total_linhas)
+        
+        st.write(f"**Mostrando linhas {inicio + 1} a {fim} de {total_linhas}**")
+        
+        # Mostrar dataframe paginado
+        altura_pagina = calcular_altura_tabela(linhas_por_pagina, total_colunas)
+        
+        st.dataframe(
+            df.iloc[inicio:fim],
+            height=altura_pagina,
+            use_container_width=True,
+            hide_index=False
+        )
     
     # Contadores
     col_count1, col_count2, col_count3 = st.columns(3)
     with col_count1:
-        st.metric("Linhas", total_linhas)
+        st.metric("📈 Total de Linhas", total_linhas)
     with col_count2:
-        st.metric("Colunas", total_colunas)
+        st.metric("📊 Total de Colunas", total_colunas)
     with col_count3:
-        ultima_data = df['Data de Solicitação'].max() if 'Data de Solicitação' in df.columns else "N/A"
-        st.metric("Última Solicitação", 
-                 ultima_data.strftime('%d/%m/%Y') if hasattr(ultima_data, 'strftime') else ultima_data)
+        if 'Data de Solicitação' in df.columns:
+            ultima_data = df['Data de Solicitação'].max()
+            if pd.notna(ultima_data) and hasattr(ultima_data, 'strftime'):
+                st.metric("📅 Última Solicitação", ultima_data.strftime('%d/%m/%Y'))
+            else:
+                st.metric("📅 Última Solicitação", "N/A")
+        else:
+            st.metric("📅 Última Atualização", datetime.now().strftime('%d/%m/%Y'))
 
 with tab2:
     # Estatísticas
@@ -221,7 +330,7 @@ with tab2:
     
     with col_stat1:
         st.write("**Resumo Numérico:**")
-        st.dataframe(df.describe(), use_container_width=True)
+        st.dataframe(df.describe(), use_container_width=True, height=300)
     
     with col_stat2:
         st.write("**Informações das Colunas:**")
@@ -259,7 +368,11 @@ with tab3:
     st.subheader("🔍 Pesquisa nos Dados")
     
     # Pesquisa por texto
-    texto_pesquisa = st.text_input("🔎 Pesquisar em todas as colunas:", placeholder="Digite um termo para buscar...")
+    texto_pesquisa = st.text_input(
+        "🔎 Pesquisar em todas as colunas:", 
+        placeholder="Digite um termo para buscar...",
+        key="pesquisa_principal"
+    )
     
     if texto_pesquisa:
         # Criar máscara de pesquisa
@@ -272,13 +385,35 @@ with tab3:
                     pass
         
         resultados = df[mask]
-        st.write(f"**{len(resultados)} resultado(s) encontrado(s):**")
-        st.dataframe(resultados, use_container_width=True, height=300)
+        
+        if len(resultados) > 0:
+            st.success(f"✅ **{len(resultados)} resultado(s) encontrado(s):**")
+            
+            # Altura dinâmica para resultados
+            altura_resultados = calcular_altura_tabela(len(resultados), len(resultados.columns))
+            
+            st.dataframe(
+                resultados, 
+                use_container_width=True, 
+                height=min(altura_resultados, 800)
+            )
+            
+            # Botão para exportar resultados
+            if st.button("📥 Exportar Resultados", key="export_resultados"):
+                csv = resultados.to_csv(index=False, encoding='utf-8-sig')
+                st.download_button(
+                    label="📥 Download CSV dos Resultados",
+                    data=csv,
+                    file_name=f"pesquisa_{texto_pesquisa}_{datetime.now().strftime('%Y%m%d_%H%M')}.csv",
+                    mime="text/csv"
+                )
+        else:
+            st.warning(f"⚠️ Nenhum resultado encontrado para '{texto_pesquisa}'")
     else:
-        st.info("Digite um termo acima para pesquisar nos dados")
+        st.info("👆 Digite um termo acima para pesquisar nos dados")
 
 # =========================================================
-# 6. FILTROS INTERATIVOS
+# 7. FILTROS INTERATIVOS
 # =========================================================
 
 st.header("🎛️ Filtros Avançados")
@@ -292,7 +427,7 @@ filtros_ativos = {}
 if 'Status' in df.columns:
     with filtro_cols[0]:
         status_opcoes = ['Todos'] + sorted(df['Status'].dropna().unique().tolist())
-        status_selecionado = st.selectbox("Status:", status_opcoes)
+        status_selecionado = st.selectbox("Status:", status_opcoes, key="filtro_status")
         if status_selecionado != 'Todos':
             filtros_ativos['Status'] = status_selecionado
 
@@ -300,7 +435,7 @@ if 'Status' in df.columns:
 if 'Prioridade' in df.columns:
     with filtro_cols[1]:
         prioridade_opcoes = ['Todos'] + sorted(df['Prioridade'].dropna().unique().tolist())
-        prioridade_selecionada = st.selectbox("Prioridade:", prioridade_opcoes)
+        prioridade_selecionada = st.selectbox("Prioridade:", prioridade_opcoes, key="filtro_prioridade")
         if prioridade_selecionada != 'Todos':
             filtros_ativos['Prioridade'] = prioridade_selecionada
 
@@ -308,72 +443,111 @@ if 'Prioridade' in df.columns:
 if 'Produção' in df.columns:
     with filtro_cols[2]:
         producao_opcoes = ['Todos'] + sorted(df['Produção'].dropna().unique().tolist())
-        producao_selecionada = st.selectbox("Produção:", producao_opcoes)
+        producao_selecionada = st.selectbox("Produção:", producao_opcoes, key="filtro_producao")
         if producao_selecionada != 'Todos':
             filtros_ativos['Produção'] = producao_selecionada
 
 # Aplicar filtros
-df_filtrado = df.copy()
-for col, valor in filtros_ativos.items():
-    df_filtrado = df_filtrado[df_filtrado[col] == valor]
-
-# Mostrar dados filtrados
 if filtros_ativos:
+    df_filtrado = df.copy()
+    for col, valor in filtros_ativos.items():
+        df_filtrado = df_filtrado[df_filtrado[col] == valor]
+    
+    # Mostrar dados filtrados
     st.subheader(f"📊 Dados Filtrados ({len(df_filtrado)} de {total_linhas} registros)")
-    st.dataframe(df_filtrado, use_container_width=True, height=400)
+    
+    altura_filtrada = calcular_altura_tabela(len(df_filtrado), len(df_filtrado.columns))
+    
+    st.dataframe(
+        df_filtrado, 
+        use_container_width=True, 
+        height=min(altura_filtrada, 800)
+    )
+    
+    # Estatísticas dos filtros
+    col_filt1, col_filt2 = st.columns(2)
+    with col_filt1:
+        st.metric("📈 Registros Filtrados", len(df_filtrado))
+    with col_filt2:
+        porcentagem = (len(df_filtrado) / total_linhas * 100) if total_linhas > 0 else 0
+        st.metric("📊 % do Total", f"{porcentagem:.1f}%")
     
     # Botão para limpar filtros
-    if st.button("🧹 Limpar Filtros"):
+    if st.button("🧹 Limpar Todos os Filtros", type="secondary"):
+        for key in [k for k in st.session_state.keys() if k.startswith('filtro_')]:
+            del st.session_state[key]
         st.rerun()
 else:
     st.info("👆 Use os filtros acima para refinar os dados")
 
 # =========================================================
-# 7. ANÁLISE DE PRAZOS (se houver coluna)
+# 8. ANÁLISE DE PRAZOS (se houver coluna)
 # =========================================================
 
-if 'Prazo em dias' in df.columns:
+if 'Prazo em dias' in df.columns or 'Prazo' in df.columns:
     st.header("⏱️ Análise de Prazos")
     
+    # Encontrar coluna de prazo
+    coluna_prazo = 'Prazo em dias' if 'Prazo em dias' in df.columns else 'Prazo'
+    
     # Processar prazos
-    df['Prazo em dias'] = df['Prazo em dias'].astype(str).str.strip()
+    df_temp = df.copy()
+    df_temp[coluna_prazo] = df_temp[coluna_prazo].astype(str).str.strip()
     
     # Classificar
     def classificar_prazo(x):
-        if pd.isna(x) or str(x).lower() == 'nan':
-            return "Sem prazo"
-        elif 'encerrado' in str(x).lower():
+        if pd.isna(x) or str(x).lower() in ['nan', 'none', 'na', '']:
+            return "Sem prazo definido"
+        elif 'encerrado' in str(x).lower() or 'concluído' in str(x).lower():
             return "Prazo encerrado"
         else:
             try:
                 dias = int(float(str(x)))
                 if dias < 0:
-                    return "Atrasado"
+                    return f"Atrasado ({abs(dias)} dias)"
+                elif dias == 0:
+                    return "Vence hoje"
                 elif dias <= 3:
-                    return "Urgente (≤3 dias)"
+                    return f"Urgente ({dias} dias)"
                 elif dias <= 7:
-                    return "Próxima semana"
+                    return f"Próxima semana ({dias} dias)"
                 else:
-                    return "Em prazo"
+                    return f"Em prazo ({dias} dias)"
             except:
                 return str(x)
     
-    df['Situação do Prazo'] = df['Prazo em dias'].apply(classificar_prazo)
+    df_temp['Situação do Prazo'] = df_temp[coluna_prazo].apply(classificar_prazo)
     
     # Mostrar distribuição
     col_prazo1, col_prazo2 = st.columns(2)
     
     with col_prazo1:
-        situacao_counts = df['Situação do Prazo'].value_counts()
+        situacao_counts = df_temp['Situação do Prazo'].value_counts()
         st.bar_chart(situacao_counts)
     
     with col_prazo2:
-        st.write("**Distribuição:**")
+        st.write("**Distribuição dos Prazos:**")
         for situacao, count in situacao_counts.items():
-            st.write(f"• {situacao}: {count} ({count/total_linhas*100:.1f}%)")
+            porcentagem = (count / total_linhas * 100) if total_linhas > 0 else 0
+            st.write(f"• **{situacao}:** {count} ({porcentagem:.1f}%)")
+    
+    # Mostrar tabela de prazos críticos
+    st.subheader("🚨 Prazos Críticos (≤ 3 dias)")
+    prazos_criticos = df_temp[df_temp['Situação do Prazo'].str.contains('Urgente|Vence hoje|Atrasado')]
+    
+    if len(prazos_criticos) > 0:
+        st.dataframe(
+            prazos_criticos[['ID', 'Título', coluna_prazo, 'Situação do Prazo', 'Responsável']] 
+            if 'Responsável' in prazos_criticos.columns else 
+            prazos_criticos[['ID', 'Título', coluna_prazo, 'Situação do Prazo']],
+            use_container_width=True,
+            height=300
+        )
+    else:
+        st.success("✅ Nenhum prazo crítico identificado!")
 
 # =========================================================
-# 8. EXPORTAÇÃO
+# 9. EXPORTAÇÃO
 # =========================================================
 
 st.header("💾 Exportar Dados")
@@ -384,26 +558,35 @@ with col_exp1:
     # CSV
     csv = df.to_csv(index=False, encoding='utf-8-sig')
     st.download_button(
-        label="📥 Download CSV",
+        label="📥 Download CSV Completo",
         data=csv,
-        file_name=f"dados_cocred_{datetime.now().strftime('%Y%m%d')}.csv",
+        file_name=f"dados_cocred_completo_{datetime.now().strftime('%Y%m%d_%H%M')}.csv",
         mime="text/csv",
-        use_container_width=True
+        use_container_width=True,
+        help="Baixar todos os dados em formato CSV"
     )
 
 with col_exp2:
     # Excel
     output = BytesIO()
     with pd.ExcelWriter(output, engine='openpyxl') as writer:
-        df.to_excel(writer, index=False, sheet_name='Dados')
+        df.to_excel(writer, index=False, sheet_name='Dados_Completos')
+        # Adicionar aba de resumo
+        resumo = pd.DataFrame({
+            'Métrica': ['Total Registros', 'Total Colunas', 'Data Exportação'],
+            'Valor': [total_linhas, total_colunas, datetime.now().strftime('%d/%m/%Y %H:%M')]
+        })
+        resumo.to_excel(writer, index=False, sheet_name='Resumo')
+    
     excel_data = output.getvalue()
     
     st.download_button(
         label="📥 Download Excel",
         data=excel_data,
-        file_name=f"dados_cocred_{datetime.now().strftime('%Y%m%d')}.xlsx",
+        file_name=f"dados_cocred_{datetime.now().strftime('%Y%m%d_%H%M')}.xlsx",
         mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-        use_container_width=True
+        use_container_width=True,
+        help="Baixar todos os dados em formato Excel com abas"
     )
 
 with col_exp3:
@@ -412,40 +595,58 @@ with col_exp3:
     st.download_button(
         label="📥 Download JSON",
         data=json_data,
-        file_name=f"dados_cocred_{datetime.now().strftime('%Y%m%d')}.json",
+        file_name=f"dados_cocred_{datetime.now().strftime('%Y%m%d_%H%M')}.json",
         mime="application/json",
-        use_container_width=True
+        use_container_width=True,
+        help="Baixar todos os dados em formato JSON"
     )
 
 # =========================================================
-# 9. DEBUG INFO (apenas se ativado)
+# 10. DEBUG INFO (apenas se ativado)
 # =========================================================
 
 if st.session_state.debug_mode:
     st.sidebar.markdown("---")
     st.sidebar.markdown("**🐛 Debug Info:**")
     
-    with st.sidebar.expander("Detalhes Técnicos"):
+    with st.sidebar.expander("Detalhes Técnicos", expanded=False):
         st.write(f"**Cache:** 1 minuto")
         st.write(f"**Hora atual:** {datetime.now().strftime('%H:%M:%S')}")
         
         token = get_access_token()
         if token:
             st.success(f"Token: ...{token[-10:]}")
+        else:
+            st.error("Token não disponível")
         
         st.write(f"**DataFrame Info:**")
         st.write(f"- Shape: {df.shape}")
         st.write(f"- Memory: {df.memory_usage(deep=True).sum() / 1024 / 1024:.2f} MB")
+        st.write(f"- Colunas: {list(df.columns)}")
         
         # Mostrar primeiras e últimas linhas
-        st.write("**Primeiras 3 linhas:**")
-        st.dataframe(df.head(3))
+        st.write("**Amostra dos Dados:**")
         
-        st.write("**Últimas 3 linhas:**")
-        st.dataframe(df.tail(3))
+        tab_debug1, tab_debug2 = st.tabs(["Primeiras 5", "Últimas 5"])
+        
+        with tab_debug1:
+            st.dataframe(df.head(5), use_container_width=True)
+        
+        with tab_debug2:
+            st.dataframe(df.tail(5), use_container_width=True)
+        
+        # Informações de tipos
+        st.write("**Tipos de Dados:**")
+        tipos_df = pd.DataFrame({
+            'Coluna': df.columns,
+            'Tipo': df.dtypes.values,
+            'Exemplo': [str(df[col].iloc[0])[:50] + '...' if len(str(df[col].iloc[0])) > 50 else str(df[col].iloc[0]) 
+                       for col in df.columns]
+        })
+        st.dataframe(tipos_df, use_container_width=True)
 
 # =========================================================
-# 10. RODAPÉ
+# 11. RODAPÉ
 # =========================================================
 
 st.divider()
@@ -459,16 +660,19 @@ with footer_col2:
     st.caption(f"📊 {total_linhas} registros | {total_colunas} colunas")
 
 with footer_col3:
-    st.caption("🔄 Atualiza a cada 1 minuto")
+    st.caption("🔄 Atualiza a cada 1 minuto | 📧 cristini.cordesco@ideatoreamericas.com")
 
 # =========================================================
-# 11. AUTO-REFRESH (opcional)
+# 12. AUTO-REFRESH (opcional)
 # =========================================================
 
 # Auto-refresh a cada 60 segundos (opcional)
-# Comente se não quiser auto-refresh
-auto_refresh = st.sidebar.checkbox("🔄 Auto-refresh (60s)", value=False)
+auto_refresh = st.sidebar.checkbox("🔄 Auto-refresh (60s)", value=False, key="auto_refresh")
 
 if auto_refresh:
-    time.sleep(60)
+    refresh_placeholder = st.empty()
+    for i in range(60, 0, -1):
+        refresh_placeholder.caption(f"🔄 Atualizando em {i} segundos...")
+        time.sleep(1)
+    refresh_placeholder.empty()
     st.rerun()
