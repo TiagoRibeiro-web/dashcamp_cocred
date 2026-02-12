@@ -19,7 +19,7 @@ pd.set_option('display.width', None)
 pd.set_option('display.max_colwidth', None)
 
 st.set_page_config(
-    page_title="Dashboard de Campanhas - SICOOB COCRED1", 
+    page_title="Dashboard de Campanhas - SICOOB COCRED", 
     layout="wide",
     page_icon="📊",
     initial_sidebar_state="expanded"
@@ -1524,7 +1524,7 @@ with footer_col2:
 with footer_col3:
     st.markdown("""
     <div style="text-align: right;">
-        <span style="color: #003366; font-weight: bold;">SICOOB COCRED</span> | 
+        <span style="color: #003366; font-weight: bold;">SICOOB COCRED1</span> | 
         <span style="color: #6C757D;">v4.2.0</span>
     </div>
     """, unsafe_allow_html=True)
