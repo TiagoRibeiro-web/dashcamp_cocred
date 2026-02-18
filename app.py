@@ -3,7 +3,7 @@ import pandas as pd
 import requests
 from io import BytesIO
 import msal
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, date
 import pytz
 import time
 import plotly.express as px
@@ -1153,7 +1153,7 @@ with tab3:
             if producao_selecionada != 'Todos':
                 filtros_ativos['Produção'] = producao_selecionada
     
-    # ========== COLUNA 4: FILTRO DE DATA DE SOLICITAÇÃO ==========
+    # ========== COLUNA 4: FILTRO DE DATA DE SOLICITAÇÃO (COM QUINZENA) ==========
     with filtro_cols[3]:
         st.markdown("**📅 Data Solicitação**")
         
@@ -1165,7 +1165,7 @@ with tab3:
                 
                 periodo_opcao = st.selectbox(
                     "Período:", 
-                    ["Todos", "Hoje", "Esta semana", "Este mês", "Últimos 30 dias", "Personalizado"], 
+                    ["Todos", "Hoje", "Esta semana", "Este mês", "Quinzena", "Últimos 30 dias", "Personalizado"], 
                     key="periodo_data"
                 )
                 hoje = datetime.now().date()
@@ -1188,6 +1188,35 @@ with tab3:
                     filtros_ativos['data_inicio'] = inicio_mes
                     filtros_ativos['data_fim'] = hoje
                     filtros_ativos['tem_filtro_data'] = True
+                elif periodo_opcao == "Quinzena":
+                    # Opções para escolher a quinzena
+                    quinzena_opcao = st.radio(
+                        "Escolha a quinzena:",
+                        ["Primeira quinzena (dias 1-15)", "Segunda quinzena (dias 16-31)"],
+                        horizontal=True,
+                        key="quinzena_opcao"
+                    )
+                    
+                    ano_atual = hoje.year
+                    mes_atual = hoje.month
+                    
+                    if quinzena_opcao == "Primeira quinzena (dias 1-15)":
+                        # Primeira quinzena: dias 1 a 15 do mês atual
+                        data_inicio_quinzena = date(ano_atual, mes_atual, 1)
+                        data_fim_quinzena = date(ano_atual, mes_atual, 15)
+                    else:
+                        # Segunda quinzena: dia 16 até último dia do mês
+                        ultimo_dia = (date(ano_atual, mes_atual, 1) + timedelta(days=32)).replace(day=1) - timedelta(days=1)
+                        data_inicio_quinzena = date(ano_atual, mes_atual, 16)
+                        data_fim_quinzena = ultimo_dia
+                    
+                    filtros_ativos['data_inicio'] = data_inicio_quinzena
+                    filtros_ativos['data_fim'] = data_fim_quinzena
+                    filtros_ativos['tem_filtro_data'] = True
+                    
+                    # Mostrar informação da quinzena selecionada
+                    st.caption(f"📅 {data_inicio_quinzena.strftime('%d/%m')} a {data_fim_quinzena.strftime('%d/%m')}")
+                    
                 elif periodo_opcao == "Últimos 30 dias":
                     inicio_30d = hoje - timedelta(days=30)
                     filtros_ativos['data_inicio'] = inicio_30d
