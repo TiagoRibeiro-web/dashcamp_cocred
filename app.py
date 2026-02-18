@@ -439,9 +439,8 @@ st.info(f"📋 **Colunas:** {', '.join(df.columns.tolist()[:5])}{'...' if len(df
 # =========================================================
 # TABS
 # =========================================================
-tab1, tab2, tab3, tab4 = st.tabs([
+tab1, tab2, tab3 = st.tabs([
     "📈 Análise Estratégica",
-    "🔍 Pesquisa",
     "🎯 KPIs COCRED",
     "📊 Dados Completos"
 ])
@@ -876,34 +875,34 @@ with tab1:
 # =========================================================
 # TAB 3: PESQUISA
 # =========================================================
-with tab3:
-    st.subheader("🔍 Pesquisa nos Dados")
+# with tab3:
+#     st.subheader("🔍 Pesquisa nos Dados")
     
-    texto_pesquisa = st.text_input(
-        "🔎 Pesquisar em todas as colunas:", 
-        placeholder="Digite um termo para buscar...",
-        key="pesquisa_principal"
-    )
+#     texto_pesquisa = st.text_input(
+#         "🔎 Pesquisar em todas as colunas:", 
+#         placeholder="Digite um termo para buscar...",
+#         key="pesquisa_principal"
+#     )
     
-    if texto_pesquisa:
-        mask = pd.Series(False, index=df.index)
-        for col in df.columns:
-            if df[col].dtype == 'object':
-                try:
-                    mask = mask | df[col].astype(str).str.contains(texto_pesquisa, case=False, na=False)
-                except:
-                    pass
+#     if texto_pesquisa:
+#         mask = pd.Series(False, index=df.index)
+#         for col in df.columns:
+#             if df[col].dtype == 'object':
+#                 try:
+#                     mask = mask | df[col].astype(str).str.contains(texto_pesquisa, case=False, na=False)
+#                 except:
+#                     pass
         
-        resultados = df[mask]
+#         resultados = df[mask]
         
-        if len(resultados) > 0:
-            st.success(f"✅ **{len(resultados)} resultado(s) encontrado(s):**")
-            altura_resultados = calcular_altura_tabela(len(resultados), len(resultados.columns))
-            st.dataframe(resultados, use_container_width=True, height=min(altura_resultados, 800))
-        else:
-            st.warning(f"⚠️ Nenhum resultado encontrado para '{texto_pesquisa}'")
-    else:
-        st.info("👆 Digite um termo acima para pesquisar nos dados")
+#         if len(resultados) > 0:
+#             st.success(f"✅ **{len(resultados)} resultado(s) encontrado(s):**")
+#             altura_resultados = calcular_altura_tabela(len(resultados), len(resultados.columns))
+#             st.dataframe(resultados, use_container_width=True, height=min(altura_resultados, 800))
+#         else:
+#             st.warning(f"⚠️ Nenhum resultado encontrado para '{texto_pesquisa}'")
+#     else:
+#         st.info("👆 Digite um termo acima para pesquisar nos dados")
 
 # =========================================================
 # TAB 4: KPIs COCRED
