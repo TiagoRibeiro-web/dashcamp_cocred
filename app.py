@@ -440,16 +440,17 @@ st.info(f"📋 **Colunas:** {', '.join(df.columns.tolist()[:5])}{'...' if len(df
 # TABS
 # =========================================================
 tab1, tab2, tab3, tab4 = st.tabs([
-    "📊 Dados Completos", 
-    "📈 Análise Estratégica", 
+    "📈 Análise Estratégica",
     "🔍 Pesquisa",
-    "🎯 KPIs COCRED"
+    "🎯 KPIs COCRED",
+    "📊 Dados Completos"
 ])
+
 
 # =========================================================
 # TAB 1: DADOS COMPLETOS
 # =========================================================
-with tab1:
+with tab4:
     if linhas_por_pagina == "Todas":
         altura_tabela = calcular_altura_tabela(total_linhas, total_colunas)
         st.subheader(f"📋 Todos os {total_linhas} registros")
@@ -495,7 +496,7 @@ with tab1:
 # =========================================================
 # TAB 2: ANÁLISE ESTRATÉGICA
 # =========================================================
-with tab2:
+with tab1:
     st.markdown("## 📈 Análise Estratégica")
     
     # Configurações de template para Plotly (funciona em dark/light)
@@ -907,7 +908,7 @@ with tab3:
 # =========================================================
 # TAB 4: KPIs COCRED
 # =========================================================
-with tab4:
+with tab3:
     st.markdown("## 🎯 KPIs - Campanhas COCRED")
     
     # Configurações de template para Plotly
