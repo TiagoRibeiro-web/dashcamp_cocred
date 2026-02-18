@@ -967,87 +967,87 @@ with tab3:
     st.divider()
     
     # ========== CARDS DE KPIs ==========
-    st.markdown("### 🎯 Indicadores Estratégicos")
+    # st.markdown("### 🎯 Indicadores Estratégicos")
     
-    col_kpi1, col_kpi2, col_kpi3, col_kpi4 = st.columns(4)
+    # col_kpi1, col_kpi2, col_kpi3, col_kpi4 = st.columns(4)
     
-    # CARD 1: CRIAÇÕES
-    if 'Tipo' in df_kpi.columns:
-        criacoes_kpi = len(df_kpi[df_kpi['Tipo'].str.contains('Criação|Criacao', na=False, case=False)])
-    else:
-        criacoes_kpi = extrair_tipo_demanda(df_kpi, 'Criação|Criacao|Novo|New')
+    # # CARD 1: CRIAÇÕES
+    # if 'Tipo' in df_kpi.columns:
+    #     criacoes_kpi = len(df_kpi[df_kpi['Tipo'].str.contains('Criação|Criacao', na=False, case=False)])
+    # else:
+    #     criacoes_kpi = extrair_tipo_demanda(df_kpi, 'Criação|Criacao|Novo|New')
     
-    percent_criacoes = (criacoes_kpi / total_kpi * 100) if total_kpi > 0 else 0
+    # percent_criacoes = (criacoes_kpi / total_kpi * 100) if total_kpi > 0 else 0
     
-    with col_kpi1:
-        st.markdown(f"""
-        <div class="metric-card-criacao">
-            <p style="font-size: 14px; margin: 0; opacity: 0.9;">🎨 CRIAÇÕES</p>
-            <p style="font-size: 36px; font-weight: bold; margin: 0;">{criacoes_kpi}</p>
-            <p style="font-size: 12px; margin: 0;">{percent_criacoes:.0f}% do total</p>
-            <p style="font-size: 11px; margin: 5px 0 0 0; opacity: 0.8;">
-                📌 Peças novas desenvolvidas
-            </p>
-        </div>
-        """, unsafe_allow_html=True)
+    # with col_kpi1:
+    #     st.markdown(f"""
+    #     <div class="metric-card-criacao">
+    #         <p style="font-size: 14px; margin: 0; opacity: 0.9;">🎨 CRIAÇÕES</p>
+    #         <p style="font-size: 36px; font-weight: bold; margin: 0;">{criacoes_kpi}</p>
+    #         <p style="font-size: 12px; margin: 0;">{percent_criacoes:.0f}% do total</p>
+    #         <p style="font-size: 11px; margin: 5px 0 0 0; opacity: 0.8;">
+    #             📌 Peças novas desenvolvidas
+    #         </p>
+    #     </div>
+    #     """, unsafe_allow_html=True)
     
-    # CARD 2: DERIVAÇÕES
-    if 'Tipo' in df_kpi.columns:
-        derivacoes_kpi = len(df_kpi[df_kpi['Tipo'].str.contains('Derivação|Derivacao|Peça|Peca', na=False, case=False)])
-    else:
-        derivacoes_kpi = extrair_tipo_demanda(df_kpi, 'Derivação|Derivacao|Peça|Peca')
+    # # CARD 2: DERIVAÇÕES
+    # if 'Tipo' in df_kpi.columns:
+    #     derivacoes_kpi = len(df_kpi[df_kpi['Tipo'].str.contains('Derivação|Derivacao|Peça|Peca', na=False, case=False)])
+    # else:
+    #     derivacoes_kpi = extrair_tipo_demanda(df_kpi, 'Derivação|Derivacao|Peça|Peca')
     
-    percent_derivacoes = (derivacoes_kpi / total_kpi * 100) if total_kpi > 0 else 0
+    # percent_derivacoes = (derivacoes_kpi / total_kpi * 100) if total_kpi > 0 else 0
     
-    with col_kpi2:
-        st.markdown(f"""
-        <div class="metric-card-derivacao">
-            <p style="font-size: 14px; margin: 0; opacity: 0.9;">🔄 DERIVAÇÕES</p>
-            <p style="font-size: 36px; font-weight: bold; margin: 0;">{derivacoes_kpi}</p>
-            <p style="font-size: 12px; margin: 0;">{percent_derivacoes:.0f}% do total</p>
-            <p style="font-size: 11px; margin: 5px 0 0 0; opacity: 0.8;">
-                📌 Adaptações de peças existentes
-            </p>
-        </div>
-        """, unsafe_allow_html=True)
+    # with col_kpi2:
+    #     st.markdown(f"""
+    #     <div class="metric-card-derivacao">
+    #         <p style="font-size: 14px; margin: 0; opacity: 0.9;">🔄 DERIVAÇÕES</p>
+    #         <p style="font-size: 36px; font-weight: bold; margin: 0;">{derivacoes_kpi}</p>
+    #         <p style="font-size: 12px; margin: 0;">{percent_derivacoes:.0f}% do total</p>
+    #         <p style="font-size: 11px; margin: 5px 0 0 0; opacity: 0.8;">
+    #             📌 Adaptações de peças existentes
+    #         </p>
+    #     </div>
+    #     """, unsafe_allow_html=True)
     
-    # CARD 3: EXTRA CONTRATO
-    if 'Tipo' in df_kpi.columns:
-        extra_kpi = len(df_kpi[df_kpi['Tipo'].str.contains('Extra|Contrato', na=False, case=False)])
-    else:
-        extra_kpi = extrair_tipo_demanda(df_kpi, 'Extra|Contrato')
+    # # CARD 3: EXTRA CONTRATO
+    # if 'Tipo' in df_kpi.columns:
+    #     extra_kpi = len(df_kpi[df_kpi['Tipo'].str.contains('Extra|Contrato', na=False, case=False)])
+    # else:
+    #     extra_kpi = extrair_tipo_demanda(df_kpi, 'Extra|Contrato')
     
-    percent_extra = (extra_kpi / total_kpi * 100) if total_kpi > 0 else 0
+    # percent_extra = (extra_kpi / total_kpi * 100) if total_kpi > 0 else 0
     
-    with col_kpi3:
-        st.markdown(f"""
-        <div class="metric-card-extra">
-            <p style="font-size: 14px; margin: 0; opacity: 0.9;">📦 EXTRA CONTRATO</p>
-            <p style="font-size: 36px; font-weight: bold; margin: 0;">{extra_kpi}</p>
-            <p style="font-size: 12px; margin: 0;">{percent_extra:.0f}% do total</p>
-            <p style="font-size: 11px; margin: 5px 0 0 0; opacity: 0.8;">
-                📌 Demandas fora do escopo
-            </p>
-        </div>
-        """, unsafe_allow_html=True)
+    # with col_kpi3:
+    #     st.markdown(f"""
+    #     <div class="metric-card-extra">
+    #         <p style="font-size: 14px; margin: 0; opacity: 0.9;">📦 EXTRA CONTRATO</p>
+    #         <p style="font-size: 36px; font-weight: bold; margin: 0;">{extra_kpi}</p>
+    #         <p style="font-size: 12px; margin: 0;">{percent_extra:.0f}% do total</p>
+    #         <p style="font-size: 11px; margin: 5px 0 0 0; opacity: 0.8;">
+    #             📌 Demandas fora do escopo
+    #         </p>
+    #     </div>
+    #     """, unsafe_allow_html=True)
     
-    # CARD 4: CAMPANHAS ATIVAS
-    if 'Campanha' in df_kpi.columns:
-        campanhas_kpi = df_kpi['Campanha'].nunique()
-    else:
-        campanhas_kpi = len(df_kpi['ID'].unique()) // 50 if 'ID' in df_kpi.columns else 12
+    # # CARD 4: CAMPANHAS ATIVAS
+    # if 'Campanha' in df_kpi.columns:
+    #     campanhas_kpi = df_kpi['Campanha'].nunique()
+    # else:
+    #     campanhas_kpi = len(df_kpi['ID'].unique()) // 50 if 'ID' in df_kpi.columns else 12
     
-    with col_kpi4:
-        st.markdown(f"""
-        <div class="metric-card-campanha">
-            <p style="font-size: 14px; margin: 0; opacity: 0.9;">🚀 CAMPANHAS</p>
-            <p style="font-size: 36px; font-weight: bold; margin: 0;">{campanhas_kpi}</p>
-            <p style="font-size: 12px; margin: 0;">ativas no período</p>
-            <p style="font-size: 11px; margin: 5px 0 0 0; opacity: 0.8;">
-                📌 Campanhas com demandas
-            </p>
-        </div>
-        """, unsafe_allow_html=True)
+    # with col_kpi4:
+    #     st.markdown(f"""
+    #     <div class="metric-card-campanha">
+    #         <p style="font-size: 14px; margin: 0; opacity: 0.9;">🚀 CAMPANHAS</p>
+    #         <p style="font-size: 36px; font-weight: bold; margin: 0;">{campanhas_kpi}</p>
+    #         <p style="font-size: 12px; margin: 0;">ativas no período</p>
+    #         <p style="font-size: 11px; margin: 5px 0 0 0; opacity: 0.8;">
+    #             📌 Campanhas com demandas
+    #         </p>
+    #     </div>
+    #     """, unsafe_allow_html=True)
     
     st.divider()
     
