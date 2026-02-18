@@ -917,17 +917,17 @@ with tab3:
     text_color = 'white' if is_dark else 'black'
     
     # ========== DESCRIÇÃO ==========
-    st.markdown("""
-    <div class="info-container-cocred">
-        <p style="margin: 0; font-size: 14px;">
-            <strong>🎯 Indicadores Estratégicos</strong> - Acompanhe os principais volumes de produção: 
-            <span style="color: #003366; font-weight: bold;">Criações</span> (novas peças), 
-            <span style="color: #00A3E0; font-weight: bold;">Derivações</span> (adaptações), 
-            <span style="color: #FF6600; font-weight: bold;">Extra Contrato</span> (fora do escopo) e 
-            <span style="color: #28A745; font-weight: bold;">Campanhas Ativas</span>.
-        </p>
-    </div>
-    """, unsafe_allow_html=True)
+    # st.markdown("""
+    # <div class="info-container-cocred">
+    #     <p style="margin: 0; font-size: 14px;">
+    #         <strong>🎯 Indicadores Estratégicos</strong> - Acompanhe os principais volumes de produção: 
+    #         <span style="color: #003366; font-weight: bold;">Criações</span> (novas peças), 
+    #         <span style="color: #00A3E0; font-weight: bold;">Derivações</span> (adaptações), 
+    #         <span style="color: #FF6600; font-weight: bold;">Extra Contrato</span> (fora do escopo) e 
+    #         <span style="color: #28A745; font-weight: bold;">Campanhas Ativas</span>.
+    #     </p>
+    # </div>
+    # """, unsafe_allow_html=True)
     
     # ========== FILTROS ==========
     col_filtro_kpi1, col_filtro_kpi2, col_filtro_kpi3 = st.columns(3)
