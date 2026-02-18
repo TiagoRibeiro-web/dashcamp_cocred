@@ -449,7 +449,7 @@ tab1, tab2, tab3 = st.tabs([
 # =========================================================
 # TAB 1: DADOS COMPLETOS
 # =========================================================
-with tab4:
+with tab3:
     if linhas_por_pagina == "Todas":
         altura_tabela = calcular_altura_tabela(total_linhas, total_colunas)
         st.subheader(f"📋 Todos os {total_linhas} registros")
@@ -907,7 +907,7 @@ with tab1:
 # =========================================================
 # TAB 4: KPIs COCRED
 # =========================================================
-with tab3:
+with tab2:
     st.markdown("## 🎯 KPIs - Campanhas COCRED")
     
     # Configurações de template para Plotly
