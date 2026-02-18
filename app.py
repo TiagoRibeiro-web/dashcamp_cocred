@@ -871,7 +871,7 @@ with tab2:
                 df_kpi = df_kpi[pd.to_datetime(df_kpi['Data de Solicitação']).dt.date >= data_limite]
     
     total_kpi = len(df_kpi)
-    st.divider()
+    #st.divider()
     
     # ========== CARDS DE KPIs (COMENTADOS NO ORIGINAL) ==========
     # st.markdown("### 🎯 Indicadores Estratégicos")
