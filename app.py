@@ -956,7 +956,7 @@ with tab2:
     #     </div>
     #     """, unsafe_allow_html=True)
     
-    st.divider()
+    #st.divider()
     
     # ========== GRÁFICOS ==========
     col_chart1, col_chart2 = st.columns([3, 2])
