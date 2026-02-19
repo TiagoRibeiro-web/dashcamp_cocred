@@ -471,6 +471,9 @@ tab1, tab2, tab3 = st.tabs([
 # =========================================================
 # TAB 1: ANÁLISE ESTRATÉGICA
 # =========================================================
+# =========================================================
+# TAB 1: ANÁLISE ESTRATÉGICA
+# =========================================================
 with tab1:
     st.markdown("## 📈 Análise Estratégica")
     
@@ -479,56 +482,57 @@ with tab1:
     plotly_template = 'plotly_dark' if is_dark else 'plotly_white'
     text_color = 'white' if is_dark else 'black'
     
-    # ========== 1. MÉTRICAS DE NEGÓCIO ==========
-    # ========== 1. MÉTRICAS DE NEGÓCIO ==========
-st.markdown("""
-<div class="info-container-cocred">
-    <p style="margin: 0; font-size: 14px;">
-        <strong>🎯 Indicadores de Performance</strong> - Acompanhe os principais KPIs do negócio.
-    </p>
-</div>
-""", unsafe_allow_html=True)
-
-# ALTERAÇÃO: Agora são 3 colunas em vez de 4!
-col_metric1, col_metric2, col_metric3 = st.columns(3)
-
-with col_metric1:
-    taxa_conclusao = (total_concluidos / total_linhas * 100) if total_linhas > 0 else 0
-    st.markdown(f"""
-    <div class="metric-card-cocred">
-        <p style="font-size: 14px; margin: 0; opacity: 0.9;">✅ TAXA DE CONCLUSÃO</p>
-        <p style="font-size: 36px; font-weight: bold; margin: 0;">{taxa_conclusao:.1f}%</p>
-        <p style="font-size: 12px; margin: 0;">{total_concluidos} de {total_linhas} concluídos</p>
-        <p style="font-size: 11px; margin: 5px 0 0 0; opacity: 0.8;">
-            📌 Percentual de demandas finalizadas
+    # ========== 1. MÉTRICAS DE NEGÓCIO (3 CARDS ALINHADOS) ==========
+    st.markdown("""
+    <div class="info-container-cocred">
+        <p style="margin: 0; font-size: 14px;">
+            <strong>🎯 Indicadores de Performance</strong> - Acompanhe os principais KPIs do negócio.
         </p>
     </div>
     """, unsafe_allow_html=True)
-
-with col_metric2:
-    st.markdown(f"""
-    <div class="metric-card-cocred" style="background: linear-gradient(135deg, #00A3E0 0%, #0077A3 100%);">
-        <p style="font-size: 14px; margin: 0; opacity: 0.9;">⏱️ TEMPO MÉDIO</p>
-        <p style="font-size: 36px; font-weight: bold; margin: 0;">4.2 dias</p>
-        <p style="font-size: 12px; margin: 0;">da solicitação à entrega</p>
-        <p style="font-size: 11px; margin: 5px 0 0 0; opacity: 0.8;">
-            📌 Tempo médio de execução
-        </p>
-    </div>
-    """, unsafe_allow_html=True)
-
-with col_metric3:
-    perc_alta = (total_alta / total_linhas * 100) if total_linhas > 0 else 0
-    st.markdown(f"""
-    <div class="metric-card-cocred" style="background: linear-gradient(135deg, #DC3545 0%, #B22222 100%);">
-        <p style="font-size: 14px; margin: 0; opacity: 0.9;">🔴 URGÊNCIA</p>
-        <p style="font-size: 36px; font-weight: bold; margin: 0;">{perc_alta:.0f}%</p>
-        <p style="font-size: 12px; margin: 0;">prioridade alta</p>
-        <p style="font-size: 11px; margin: 5px 0 0 0; opacity: 0.8;">
-            📌 Demandas com prioridade alta
-        </p>
-    </div>
-    """, unsafe_allow_html=True)
+    
+    # AGORA SÃO 3 COLUNAS EM VEZ DE 4!
+    col_metric1, col_metric2, col_metric3 = st.columns(3)
+    
+    with col_metric1:
+        taxa_conclusao = (total_concluidos / total_linhas * 100) if total_linhas > 0 else 0
+        st.markdown(f"""
+        <div class="metric-card-cocred">
+            <p style="font-size: 14px; margin: 0; opacity: 0.9;">✅ TAXA DE CONCLUSÃO</p>
+            <p style="font-size: 36px; font-weight: bold; margin: 0;">{taxa_conclusao:.1f}%</p>
+            <p style="font-size: 12px; margin: 0;">{total_concluidos} de {total_linhas} concluídos</p>
+            <p style="font-size: 11px; margin: 5px 0 0 0; opacity: 0.8;">
+                📌 Percentual de demandas finalizadas
+            </p>
+        </div>
+        """, unsafe_allow_html=True)
+    
+    with col_metric2:
+        st.markdown(f"""
+        <div class="metric-card-cocred" style="background: linear-gradient(135deg, #00A3E0 0%, #0077A3 100%);">
+            <p style="font-size: 14px; margin: 0; opacity: 0.9;">⏱️ TEMPO MÉDIO</p>
+            <p style="font-size: 36px; font-weight: bold; margin: 0;">4.2 dias</p>
+            <p style="font-size: 12px; margin: 0;">da solicitação à entrega</p>
+            <p style="font-size: 11px; margin: 5px 0 0 0; opacity: 0.8;">
+                📌 Tempo médio de execução
+            </p>
+        </div>
+        """, unsafe_allow_html=True)
+    
+    with col_metric3:
+        perc_alta = (total_alta / total_linhas * 100) if total_linhas > 0 else 0
+        st.markdown(f"""
+        <div class="metric-card-cocred" style="background: linear-gradient(135deg, #DC3545 0%, #B22222 100%);">
+            <p style="font-size: 14px; margin: 0; opacity: 0.9;">🔴 URGÊNCIA</p>
+            <p style="font-size: 36px; font-weight: bold; margin: 0;">{perc_alta:.0f}%</p>
+            <p style="font-size: 12px; margin: 0;">prioridade alta</p>
+            <p style="font-size: 11px; margin: 5px 0 0 0; opacity: 0.8;">
+                📌 Demandas com prioridade alta
+            </p>
+        </div>
+        """, unsafe_allow_html=True)
+    
+    st.divider()
     
     # ========== 2. ANÁLISE POR SOLICITANTE ==========
     if 'Solicitante' in df.columns:
