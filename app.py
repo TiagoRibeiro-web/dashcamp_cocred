@@ -1246,7 +1246,7 @@ with tab2:
         st.dataframe(origem_exemplo, use_container_width=True, height=350, hide_index=True)
 
 # =========================================================
-# TAB 3: EXPLORADOR DE DADOS (NOVA VERSÃO OTIMIZADA!)
+# TAB 3: EXPLORADOR DE DADOS (COM FILTRO DE DATA DE ENTREGA)
 # =========================================================
 with tab3:
     st.markdown("## 📋 Explorador de Dados")
@@ -1268,7 +1268,7 @@ with tab3:
             data_min = df['Data de Solicitação'].min().strftime('%d/%m/%Y')
             data_max = df['Data de Solicitação'].max().strftime('%d/%m/%Y')
             st.metric(
-                label="📅 Vigência", 
+                label="📅 Período", 
                 value=f"{data_min} a {data_max}",
                 help="Período coberto pelos dados"
             )
@@ -1296,7 +1296,7 @@ with tab3:
     st.divider()
     
     # =========================================================
-    # FILTROS AVANÇADOS (COMPACTOS EM 2 LINHAS)
+    # FILTROS AVANÇADOS (AGORA COM DATA DE ENTREGA!)
     # =========================================================
     with st.container():
         st.markdown("##### 🔍 Filtros Avançados")
@@ -1327,8 +1327,8 @@ with tab3:
                 if producao_selecionada != 'Todos':
                     filtros_ativos['Produção'] = producao_selecionada
         
-        # Segunda linha de filtros (datas)
-        col_f4, col_f5, col_f6 = st.columns([2, 2, 1])
+        # Segunda linha de filtros (datas) - AGORA COM 4 COLUNAS!
+        col_f4, col_f5, col_f6, col_f7 = st.columns([2, 2, 2, 1])
         
         with col_f4:
             if 'Data de Solicitação' in df.columns:
@@ -1405,7 +1405,7 @@ with tab3:
             # Procurar por colunas de deadline
             coluna_deadline = None
             for col in df.columns:
-                if 'deadline' in col.lower() or 'prazo' in col.lower() or 'data entrega' in col.lower():
+                if 'deadline' in col.lower() or 'prazo' in col.lower():
                     coluna_deadline = col
                     break
             
@@ -1475,6 +1475,75 @@ with tab3:
                 st.selectbox("⏰ Deadline", ["Indisponível"], disabled=True, key="tab3_deadline_disabled")
         
         with col_f6:
+            # NOVO FILTRO: DATA DE ENTREGA!
+            # Procurar por colunas de data de entrega
+            coluna_entrega = None
+            for col in df.columns:
+                if 'entrega' in col.lower() or 'data entrega' in col.lower() or 'dt entrega' in col.lower():
+                    coluna_entrega = col
+                    break
+            
+            if coluna_entrega is None and 'Data de Entrega' in df.columns:
+                coluna_entrega = 'Data de Entrega'
+            
+            if coluna_entrega:
+                periodo_entrega = st.selectbox(
+                    "📦 Data de Entrega", 
+                    ["Todos", "Hoje", "Esta semana", "Este mês", "Últimos 7 dias", "Últimos 30 dias", "Personalizado"],
+                    key="tab3_periodo_entrega"
+                )
+                
+                hoje = datetime.now().date()
+                
+                if periodo_entrega != "Todos":
+                    datas_validas_entrega = df[coluna_entrega].dropna()
+                    if not datas_validas_entrega.empty:
+                        data_min_entrega = datas_validas_entrega.min().date()
+                        data_max_entrega = datas_validas_entrega.max().date()
+                        
+                        if periodo_entrega == "Hoje":
+                            filtros_ativos['entrega_inicio'] = hoje
+                            filtros_ativos['entrega_fim'] = hoje
+                            filtros_ativos['tem_filtro_entrega'] = True
+                            filtros_ativos['coluna_entrega'] = coluna_entrega
+                        elif periodo_entrega == "Esta semana":
+                            inicio_semana = hoje - timedelta(days=hoje.weekday())
+                            fim_semana = inicio_semana + timedelta(days=6)
+                            filtros_ativos['entrega_inicio'] = inicio_semana
+                            filtros_ativos['entrega_fim'] = fim_semana
+                            filtros_ativos['tem_filtro_entrega'] = True
+                            filtros_ativos['coluna_entrega'] = coluna_entrega
+                        elif periodo_entrega == "Este mês":
+                            inicio_mes = hoje.replace(day=1)
+                            ultimo_dia = (inicio_mes + timedelta(days=32)).replace(day=1) - timedelta(days=1)
+                            filtros_ativos['entrega_inicio'] = inicio_mes
+                            filtros_ativos['entrega_fim'] = ultimo_dia
+                            filtros_ativos['tem_filtro_entrega'] = True
+                            filtros_ativos['coluna_entrega'] = coluna_entrega
+                        elif periodo_entrega == "Últimos 7 dias":
+                            filtros_ativos['entrega_inicio'] = hoje - timedelta(days=7)
+                            filtros_ativos['entrega_fim'] = hoje
+                            filtros_ativos['tem_filtro_entrega'] = True
+                            filtros_ativos['coluna_entrega'] = coluna_entrega
+                        elif periodo_entrega == "Últimos 30 dias":
+                            filtros_ativos['entrega_inicio'] = hoje - timedelta(days=30)
+                            filtros_ativos['entrega_fim'] = hoje
+                            filtros_ativos['tem_filtro_entrega'] = True
+                            filtros_ativos['coluna_entrega'] = coluna_entrega
+                        elif periodo_entrega == "Personalizado":
+                            col_de1, col_de2 = st.columns(2)
+                            with col_de1:
+                                data_ini_entrega = st.date_input("De", data_min_entrega, key="tab3_entrega_ini")
+                            with col_de2:
+                                data_fim_entrega = st.date_input("Até", data_max_entrega, key="tab3_entrega_fim")
+                            filtros_ativos['entrega_inicio'] = data_ini_entrega
+                            filtros_ativos['entrega_fim'] = data_fim_entrega
+                            filtros_ativos['tem_filtro_entrega'] = True
+                            filtros_ativos['coluna_entrega'] = coluna_entrega
+            else:
+                st.selectbox("📦 Data de Entrega", ["Indisponível"], disabled=True, key="tab3_entrega_disabled")
+        
+        with col_f7:
             st.markdown("<br>", unsafe_allow_html=True)  # Espaço para alinhar com os selects acima
             aplicar_filtros = st.button("🔍 Aplicar Filtros", type="primary", use_container_width=True, key="tab3_aplicar_filtros")
     
@@ -1494,13 +1563,14 @@ with tab3:
     
     with col_export:
         st.markdown("<br>", unsafe_allow_html=True)
-        # Preparar dados para exportação - CORREÇÃO APLICADA!
+        # Preparar dados para exportação
         df_export = df.copy()
         
         # Aplicar filtros categóricos
         for col, valor in filtros_ativos.items():
             if col not in ['data_inicio', 'data_fim', 'tem_filtro_data', 
-                           'deadline_inicio', 'deadline_fim', 'tem_filtro_deadline', 'coluna_deadline']:
+                           'deadline_inicio', 'deadline_fim', 'tem_filtro_deadline', 'coluna_deadline',
+                           'entrega_inicio', 'entrega_fim', 'tem_filtro_entrega', 'coluna_entrega']:
                 df_export = df_export[df_export[col] == valor]
         
         # Aplicar filtro de data de solicitação
@@ -1521,6 +1591,17 @@ with tab3:
                 df_export = df_export[
                     (df_export[col_deadline] >= deadline_inicio) & 
                     (df_export[col_deadline] <= deadline_fim)
+                ]
+        
+        # Aplicar filtro de data de entrega (NOVO!)
+        if 'tem_filtro_entrega' in filtros_ativos and 'coluna_entrega' in filtros_ativos:
+            col_entrega = filtros_ativos['coluna_entrega']
+            if col_entrega in df_export.columns:
+                entrega_inicio = pd.Timestamp(filtros_ativos['entrega_inicio'])
+                entrega_fim = pd.Timestamp(filtros_ativos['entrega_fim']) + pd.Timedelta(days=1) - pd.Timedelta(seconds=1)
+                df_export = df_export[
+                    (df_export[col_entrega] >= entrega_inicio) & 
+                    (df_export[col_entrega] <= entrega_fim)
                 ]
         
         # Aplicar pesquisa
@@ -1561,7 +1642,8 @@ with tab3:
     # Aplicar filtros categóricos
     for col, valor in filtros_ativos.items():
         if col not in ['data_inicio', 'data_fim', 'tem_filtro_data', 
-                       'deadline_inicio', 'deadline_fim', 'tem_filtro_deadline', 'coluna_deadline']:
+                       'deadline_inicio', 'deadline_fim', 'tem_filtro_deadline', 'coluna_deadline',
+                       'entrega_inicio', 'entrega_fim', 'tem_filtro_entrega', 'coluna_entrega']:
             df_final = df_final[df_final[col] == valor]
     
     # Aplicar filtro de data de solicitação
@@ -1582,6 +1664,17 @@ with tab3:
             df_final = df_final[
                 (df_final[col_deadline] >= deadline_inicio) & 
                 (df_final[col_deadline] <= deadline_fim)
+            ]
+    
+    # Aplicar filtro de data de entrega (NOVO!)
+    if 'tem_filtro_entrega' in filtros_ativos and 'coluna_entrega' in filtros_ativos:
+        col_entrega = filtros_ativos['coluna_entrega']
+        if col_entrega in df_final.columns:
+            entrega_inicio = pd.Timestamp(filtros_ativos['entrega_inicio'])
+            entrega_fim = pd.Timestamp(filtros_ativos['entrega_fim']) + pd.Timedelta(days=1) - pd.Timedelta(seconds=1)
+            df_final = df_final[
+                (df_final[col_entrega] >= entrega_inicio) & 
+                (df_final[col_entrega] <= entrega_fim)
             ]
     
     # Aplicar pesquisa
