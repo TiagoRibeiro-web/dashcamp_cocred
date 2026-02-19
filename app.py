@@ -635,7 +635,7 @@ with tab1:
         evolucao_mensal.columns = ['Período', 'Quantidade']
         
         # Layout: 4 colunas de métricas no topo
-        col_temp1, col_temp2, col_temp3, col_temp4 = st.columns(4)
+        col_temp1, col_temp2, col_temp4 = st.columns(3)
         
         with col_temp1:
             total_ano = len(df_temp[df_temp['Ano'] == ano_atual])
