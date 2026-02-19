@@ -261,14 +261,6 @@ def extrair_tipo_demanda(df, texto):
                 pass
     return count
 
-def aplicar_filtros_data(df, coluna_data, data_inicio, data_fim):
-    """Aplica filtro de data em uma coluna específica"""
-    if coluna_data in df.columns and data_inicio and data_fim:
-        data_inicio_ts = pd.Timestamp(data_inicio)
-        data_fim_ts = pd.Timestamp(data_fim) + pd.Timedelta(days=1) - pd.Timedelta(seconds=1)
-        return df[(df[coluna_data] >= data_inicio_ts) & (df[coluna_data] <= data_fim_ts)]
-    return df
-
 # =========================================================
 # CARREGAR DADOS
 # =========================================================
@@ -1394,12 +1386,44 @@ with tab3:
     
     with col_export:
         st.markdown("<br>", unsafe_allow_html=True)
-        # Preparar dados para exportação
+        # Preparar dados para exportação - CORREÇÃO APLICADA!
         df_export = df.copy()
-        if filtros_ativos:
-            df_export = aplicar_filtros_completos(df, filtros_ativos)
+        
+        # Aplicar filtros categóricos
+        for col, valor in filtros_ativos.items():
+            if col not in ['data_inicio', 'data_fim', 'tem_filtro_data', 
+                           'deadline_inicio', 'deadline_fim', 'tem_filtro_deadline', 'coluna_deadline']:
+                df_export = df_export[df_export[col] == valor]
+        
+        # Aplicar filtro de data de solicitação
+        if 'tem_filtro_data' in filtros_ativos and 'Data de Solicitação' in df.columns:
+            data_inicio = pd.Timestamp(filtros_ativos['data_inicio'])
+            data_fim = pd.Timestamp(filtros_ativos['data_fim']) + pd.Timedelta(days=1) - pd.Timedelta(seconds=1)
+            df_export = df_export[
+                (df_export['Data de Solicitação'] >= data_inicio) & 
+                (df_export['Data de Solicitação'] <= data_fim)
+            ]
+        
+        # Aplicar filtro de deadline
+        if 'tem_filtro_deadline' in filtros_ativos and 'coluna_deadline' in filtros_ativos:
+            col_deadline = filtros_ativos['coluna_deadline']
+            if col_deadline in df_export.columns:
+                deadline_inicio = pd.Timestamp(filtros_ativos['deadline_inicio'])
+                deadline_fim = pd.Timestamp(filtros_ativos['deadline_fim']) + pd.Timedelta(days=1) - pd.Timedelta(seconds=1)
+                df_export = df_export[
+                    (df_export[col_deadline] >= deadline_inicio) & 
+                    (df_export[col_deadline] <= deadline_fim)
+                ]
+        
+        # Aplicar pesquisa
         if termo_pesquisa:
-            mask = df_export.apply(lambda row: row.astype(str).str.contains(termo_pesquisa, case=False).any(), axis=1)
+            mask = pd.Series(False, index=df_export.index)
+            for col in df_export.columns:
+                if df_export[col].dtype == 'object':
+                    try:
+                        mask = mask | df_export[col].astype(str).str.contains(termo_pesquisa, case=False, na=False)
+                    except:
+                        pass
             df_export = df_export[mask]
         
         csv = df_export.to_csv(index=False, encoding='utf-8-sig')
@@ -1408,12 +1432,13 @@ with tab3:
             data=csv,
             file_name=f"dados_cocred_{datetime.now().strftime('%Y%m%d_%H%M')}.csv",
             mime="text/csv",
-            use_container_width=True
+            use_container_width=True,
+            key="tab3_export_csv"
         )
     
     with col_clear:
         st.markdown("<br>", unsafe_allow_html=True)
-        if filtros_ativos or termo_pesquisa:
+        if filtros_ativos or (termo_pesquisa and termo_pesquisa.strip() != ""):
             if st.button("🧹 Limpar Tudo", use_container_width=True, key="tab3_limpar"):
                 for key in list(st.session_state.keys()):
                     if key.startswith('tab3_'):
@@ -1421,7 +1446,7 @@ with tab3:
                 st.rerun()
     
     # =========================================================
-    # APLICAR FILTROS E PESQUISA
+    # APLICAR FILTROS E PESQUISA PARA A TABELA PRINCIPAL
     # =========================================================
     df_final = df.copy()
     
@@ -1539,10 +1564,8 @@ with tab3:
 #     ... (código original comentado)
 
 # =========================================================
-# EXPORTAÇÃO (JÁ INTEGRADA NA TAB3)
+# EXPORTAÇÃO (COMPLETA EM MÚLTIPLOS FORMATOS)
 # =========================================================
-# A exportação agora está integrada diretamente na tab3 com o botão de CSV
-# Mantendo a exportação completa em múltiplos formatos fora das tabs
 st.header("💾 Exportar Dados (Todos os Formatos)")
 
 df_exportar = df_final if 'df_final' in locals() and (filtros_ativos or termo_pesquisa) else df
