@@ -813,6 +813,9 @@ with tab1:
 # =========================================================
 # TAB 2: KPIs COCRED
 # =========================================================
+# =========================================================
+# TAB 2: KPIs COCRED
+# =========================================================
 with tab2:
     st.markdown("## 🎯 KPIs - Campanhas COCRED")
     
@@ -858,91 +861,6 @@ with tab2:
     total_kpi = len(df_kpi)
     st.divider()
     
-    # ========== CARDS DE KPIs (COMENTADOS NO ORIGINAL) ==========
-    # st.markdown("### 🎯 Indicadores Estratégicos")
-    
-    # col_kpi1, col_kpi2, col_kpi3, col_kpi4 = st.columns(4)
-    
-    # # CARD 1: CRIAÇÕES
-    # if 'Tipo' in df_kpi.columns:
-    #     criacoes_kpi = len(df_kpi[df_kpi['Tipo'].str.contains('Criação|Criacao', na=False, case=False)])
-    # else:
-    #     criacoes_kpi = extrair_tipo_demanda(df_kpi, 'Criação|Criacao|Novo|New')
-    
-    # percent_criacoes = (criacoes_kpi / total_kpi * 100) if total_kpi > 0 else 0
-    
-    # with col_kpi1:
-    #     st.markdown(f"""
-    #     <div class="metric-card-criacao">
-    #         <p style="font-size: 14px; margin: 0; opacity: 0.9;">🎨 CRIAÇÕES</p>
-    #         <p style="font-size: 36px; font-weight: bold; margin: 0;">{criacoes_kpi}</p>
-    #         <p style="font-size: 12px; margin: 0;">{percent_criacoes:.0f}% do total</p>
-    #         <p style="font-size: 11px; margin: 5px 0 0 0; opacity: 0.8;">
-    #             📌 Peças novas desenvolvidas
-    #         </p>
-    #     </div>
-    #     """, unsafe_allow_html=True)
-    
-    # # CARD 2: DERIVAÇÕES
-    # if 'Tipo' in df_kpi.columns:
-    #     derivacoes_kpi = len(df_kpi[df_kpi['Tipo'].str.contains('Derivação|Derivacao|Peça|Peca', na=False, case=False)])
-    # else:
-    #     derivacoes_kpi = extrair_tipo_demanda(df_kpi, 'Derivação|Derivacao|Peça|Peca')
-    
-    # percent_derivacoes = (derivacoes_kpi / total_kpi * 100) if total_kpi > 0 else 0
-    
-    # with col_kpi2:
-    #     st.markdown(f"""
-    #     <div class="metric-card-derivacao">
-    #         <p style="font-size: 14px; margin: 0; opacity: 0.9;">🔄 DERIVAÇÕES</p>
-    #         <p style="font-size: 36px; font-weight: bold; margin: 0;">{derivacoes_kpi}</p>
-    #         <p style="font-size: 12px; margin: 0;">{percent_derivacoes:.0f}% do total</p>
-    #         <p style="font-size: 11px; margin: 5px 0 0 0; opacity: 0.8;">
-    #             📌 Adaptações de peças existentes
-    #         </p>
-    #     </div>
-    #     """, unsafe_allow_html=True)
-    
-    # # CARD 3: EXTRA CONTRATO
-    # if 'Tipo' in df_kpi.columns:
-    #     extra_kpi = len(df_kpi[df_kpi['Tipo'].str.contains('Extra|Contrato', na=False, case=False)])
-    # else:
-    #     extra_kpi = extrair_tipo_demanda(df_kpi, 'Extra|Contrato')
-    
-    # percent_extra = (extra_kpi / total_kpi * 100) if total_kpi > 0 else 0
-    
-    # with col_kpi3:
-    #     st.markdown(f"""
-    #     <div class="metric-card-extra">
-    #         <p style="font-size: 14px; margin: 0; opacity: 0.9;">📦 EXTRA CONTRATO</p>
-    #         <p style="font-size: 36px; font-weight: bold; margin: 0;">{extra_kpi}</p>
-    #         <p style="font-size: 12px; margin: 0;">{percent_extra:.0f}% do total</p>
-    #         <p style="font-size: 11px; margin: 5px 0 0 0; opacity: 0.8;">
-    #             📌 Demandas fora do escopo
-    #         </p>
-    #     </div>
-    #     """, unsafe_allow_html=True)
-    
-    # # CARD 4: CAMPANHAS ATIVAS
-    # if 'Campanha' in df_kpi.columns:
-    #     campanhas_kpi = df_kpi['Campanha'].nunique()
-    # else:
-    #     campanhas_kpi = len(df_kpi['ID'].unique()) // 50 if 'ID' in df_kpi.columns else 12
-    
-    # with col_kpi4:
-    #     st.markdown(f"""
-    #     <div class="metric-card-campanha">
-    #         <p style="font-size: 14px; margin: 0; opacity: 0.9;">🚀 CAMPANHAS</p>
-    #         <p style="font-size: 36px; font-weight: bold; margin: 0;">{campanhas_kpi}</p>
-    #         <p style="font-size: 12px; margin: 0;">ativas no período</p>
-    #         <p style="font-size: 11px; margin: 5px 0 0 0; opacity: 0.8;">
-    #             📌 Campanhas com demandas
-    #         </p>
-    #     </div>
-    #     """, unsafe_allow_html=True)
-    
-    st.divider()
-    
     # ========== GRÁFICOS ==========
     col_chart1, col_chart2 = st.columns([3, 2])
     
@@ -950,50 +868,73 @@ with tab2:
         st.markdown("""
         <div style="background: rgba(0, 51, 102, 0.1); padding: 10px; border-radius: 10px; margin-bottom: 10px;">
             <p style="margin: 0; font-size: 13px;">
-                <strong style="color: #003366;">🏆 Top Campanhas</strong> - Rankings das campanhas com maior volume.
+                <strong style="color: #003366;">📊 Todas as Campanhas</strong> - Distribuição completa do portfólio.
             </p>
         </div>
         """, unsafe_allow_html=True)
         
         if 'Campanha' in df_kpi.columns:
-            campanhas_top = df_kpi['Campanha'].value_counts().head(8).reset_index()
-            campanhas_top.columns = ['Campanha', 'Quantidade']
-            df_campanhas = campanhas_top
+            # Todas as campanhas ordenadas por volume
+            todas_campanhas = df_kpi['Campanha'].value_counts().reset_index()
+            todas_campanhas.columns = ['Campanha', 'Demandas']
+            total_campanhas = len(todas_campanhas)
+            
+            # Criar gráfico com todas as campanhas
+            fig_completo = px.bar(
+                todas_campanhas.sort_values('Demandas', ascending=True),
+                x='Demandas',
+                y='Campanha',
+                orientation='h',
+                title=f"Distribuição de Demandas por Campanha (Total: {total_campanhas} campanhas)",
+                color='Demandas',
+                color_continuous_scale='Blues',
+                text='Demandas',
+                template=plotly_template
+            )
+            
+            fig_completo.update_traces(
+                textposition='outside',
+                texttemplate='%{text}',
+                textfont=dict(size=10, color=text_color),
+                hovertemplate='<b>%{y}</b><br>Demandas: %{x}<extra></extra>'
+            )
+            
+            fig_completo.update_layout(
+                height=min(600, 20 * total_campanhas),  # Altura dinâmica
+                xaxis_title="Número de Demandas",
+                yaxis_title="",
+                font=dict(color=text_color),
+                paper_bgcolor='rgba(0,0,0,0)',
+                plot_bgcolor='rgba(0,0,0,0)',
+                margin=dict(l=10, r=30, t=50, b=10),
+                coloraxis_showscale=False,  # Remove a barra de cores
+                hoverlabel=dict(bgcolor="white", font_size=12)
+            )
+            
+            # Configuração simples de zoom
+            st.plotly_chart(fig_completo, use_container_width=True, config={
+                'displayModeBar': True,
+                'modeBarButtonsToAdd': ['zoomIn', 'zoomOut', 'pan', 'resetScale'],
+                'displaylogo': False
+            })
+            
+            # Métricas simples
+            col_simples1, col_simples2 = st.columns(2)
+            
+            with col_simples1:
+                st.metric(
+                    label="📌 Total de Campanhas",
+                    value=total_campanhas
+                )
+            
+            with col_simples2:
+                total_demandas = todas_campanhas['Demandas'].sum()
+                st.metric(
+                    label="📊 Total de Demandas",
+                    value=total_demandas
+                )
         else:
-            campanhas_data = {
-                'Campanha': ['Campanha de Crédito Automático', 'Campanha de Consórcios', 
-                            'Campanha de Crédito PJ', 'Campanha de Investimentos',
-                            'Campanha de Conta Digital', 'Atualização de TVs internas'],
-                'Quantidade': [46, 36, 36, 36, 28, 12]
-            }
-            df_campanhas = pd.DataFrame(campanhas_data)
-        
-        fig_campanhas = px.bar(
-            df_campanhas.sort_values('Quantidade', ascending=True),
-            x='Quantidade',
-            y='Campanha',
-            orientation='h',
-            title='Top Campanhas',
-            color='Quantidade',
-            color_continuous_scale='Blues',
-            text='Quantidade',
-            template=plotly_template
-        )
-        
-        fig_campanhas.update_traces(
-            textposition='outside',
-            texttemplate='%{text}',
-            textfont=dict(size=12, color=text_color)
-        )
-        
-        fig_campanhas.update_layout(
-            height=400,
-            showlegend=False,
-            font=dict(color=text_color),
-            paper_bgcolor='rgba(0,0,0,0)',
-            plot_bgcolor='rgba(0,0,0,0)'
-        )
-        st.plotly_chart(fig_campanhas, use_container_width=True, config={'displayModeBar': False})
+            st.info("ℹ️ Dados de campanha não disponíveis")
     
     with col_chart2:
         st.markdown("""
