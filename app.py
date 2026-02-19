@@ -813,8 +813,7 @@ with tab1:
 # =========================================================
 # TAB 2: KPIs COCRED
 # =========================================================
-# TAB 2: KPIs COCRED
-# =========================================================
+
 with tab2:
     st.markdown("## 🎯 KPIs - Campanhas COCRED")
     
@@ -860,19 +859,24 @@ with tab2:
     total_kpi = len(df_kpi)
     st.divider()
     
-    # ========== GRÁFICOS ==========
+    # ========== GRÁFICOS INTERATIVOS ==========
+    
+    # Inicializar session state para campanha selecionada
+    if 'campanha_selecionada' not in st.session_state:
+        st.session_state.campanha_selecionada = None
+    
     col_chart1, col_chart2 = st.columns([3, 2])
     
     with col_chart1:
         st.markdown("""
         <div style="background: rgba(0, 51, 102, 0.1); padding: 10px; border-radius: 10px; margin-bottom: 10px;">
             <p style="margin: 0; font-size: 13px;">
-                <strong style="color: #003366;">🏆 Top 10 Campanhas</strong> - Rankings das campanhas com maior volume.
+                <strong style="color: #003366;">🏆 Top 10 Campanhas</strong> - Clique em uma barra para detalhar no gráfico ao lado.
             </p>
         </div>
         """, unsafe_allow_html=True)
         
-        # Procurar por coluna de campanha (várias possibilidades)
+        # Procurar por coluna de campanha
         coluna_campanha = None
         possiveis_nomes = ['Campanha', 'campanha', 'CAMPANHA', 'Nome da Campanha', 'Campanhas', 'campanhas']
         
@@ -891,8 +895,17 @@ with tab2:
             campanhas_top = campanhas_top[campanhas_top['Campanha'] != '']
             
             if not campanhas_top.empty:
+                # Ordenar para o gráfico
+                campanhas_top = campanhas_top.sort_values('Quantidade', ascending=True)
+                
+                # Criar lista de cores (destacar a selecionada)
+                cores = ['#003366'] * len(campanhas_top)
+                if st.session_state.campanha_selecionada in campanhas_top['Campanha'].values:
+                    idx = campanhas_top[campanhas_top['Campanha'] == st.session_state.campanha_selecionada].index[0]
+                    cores[campanhas_top.index.get_loc(idx)] = '#FF6600'  # Laranja para destacar
+                
                 fig_campanhas = px.bar(
-                    campanhas_top.sort_values('Quantidade', ascending=True),
+                    campanhas_top,
                     x='Quantidade',
                     y='Campanha',
                     orientation='h',
@@ -903,11 +916,14 @@ with tab2:
                     template=plotly_template
                 )
                 
+                # Personalizar cores das barras
                 fig_campanhas.update_traces(
+                    marker_color=cores,
                     textposition='outside',
                     texttemplate='%{text}',
                     textfont=dict(size=12, color=text_color),
-                    hovertemplate='<b>%{y}</b><br>Demandas: %{x}<extra></extra>'
+                    hovertemplate='<b>%{y}</b><br>Demandas: %{x}<br><i>Clique para detalhar</i><extra></extra>',
+                    customdata=campanhas_top['Campanha']  # Passar nome da campanha para o evento de clique
                 )
                 
                 fig_campanhas.update_layout(
@@ -918,24 +934,50 @@ with tab2:
                     font=dict(color=text_color),
                     paper_bgcolor='rgba(0,0,0,0)',
                     plot_bgcolor='rgba(0,0,0,0)',
-                    margin=dict(l=10, r=30, t=40, b=10)
+                    margin=dict(l=10, r=30, t=40, b=10),
+                    clickmode='event+select'  # Habilitar eventos de clique
                 )
-                st.plotly_chart(fig_campanhas, use_container_width=True, config={'displayModeBar': False})
+                
+                # Capturar evento de clique
+                evento_clique = st.plotly_chart(
+                    fig_campanhas, 
+                    use_container_width=True, 
+                    config={'displayModeBar': False},
+                    key="grafico_campanhas",
+                    on_select=lambda: tratar_clique_campanha()  # Callback quando clicar
+                )
+                
+                # Processar clique se houver
+                if evento_clique and 'points' in evento_clique and len(evento_clique['points']) > 0:
+                    campanha_clicada = evento_clique['points'][0]['y']
+                    if campanha_clicada != st.session_state.campanha_selecionada:
+                        st.session_state.campanha_selecionada = campanha_clicada
+                        st.rerun()
+                
+                # Botão para limpar seleção
+                if st.session_state.campanha_selecionada:
+                    col_btn1, col_btn2 = st.columns([3, 1])
+                    with col_btn2:
+                        if st.button("🧹 Limpar Seleção", key="limpar_selecao"):
+                            st.session_state.campanha_selecionada = None
+                            st.rerun()
                 
                 # Métrica simples do Top 1
-                top1_campanha = campanhas_top.iloc[-1]['Campanha']  # O último após ordenar é o maior
+                top1_campanha = campanhas_top.iloc[-1]['Campanha']
                 top1_valor = campanhas_top.iloc[-1]['Quantidade']
                 
-                if len(top1_campanha) > 50:
-                    st.caption(f"🥇 **Líder:** {top1_campanha[:50]}... ({top1_valor} demandas)")
+                if st.session_state.campanha_selecionada:
+                    st.info(f"🔍 **Campanha selecionada:** {st.session_state.campanha_selecionada}")
                 else:
-                    st.caption(f"🥇 **Líder:** {top1_campanha} ({top1_valor} demandas)")
+                    if len(top1_campanha) > 50:
+                        st.caption(f"🥇 **Líder:** {top1_campanha[:50]}... ({top1_valor} demandas)")
+                    else:
+                        st.caption(f"🥇 **Líder:** {top1_campanha} ({top1_valor} demandas)")
             else:
                 st.info("ℹ️ Dados de campanha não disponíveis")
         else:
             st.info("ℹ️ Dados de campanha não disponíveis")
             
-            # Modo debug (opcional)
             if st.session_state.get('debug_mode', False):
                 st.caption("📋 Colunas disponíveis:")
                 st.write(df_kpi.columns.tolist())
@@ -944,105 +986,112 @@ with tab2:
         st.markdown("""
         <div style="background: rgba(0, 51, 102, 0.1); padding: 10px; border-radius: 10px; margin-bottom: 10px;">
             <p style="margin: 0; font-size: 13px;">
-                <strong style="color: #003366;">🎯 Distribuição por Status</strong> - Estágios das demandas.
+                <strong style="color: #003366;">🎯 Distribuição por Status</strong> - 
+                {}.
             </p>
         </div>
-        """, unsafe_allow_html=True)
+        """.format(
+            f"Detalhando: {st.session_state.campanha_selecionada}" if st.session_state.campanha_selecionada 
+            else "Visão geral de todas as campanhas"
+        ), unsafe_allow_html=True)
         
         if 'Status' in df_kpi.columns:
-            status_dist = df_kpi['Status'].value_counts().reset_index()
+            # Filtrar por campanha selecionada se houver
+            if st.session_state.campanha_selecionada and coluna_campanha:
+                df_filtrado = df_kpi[df_kpi[coluna_campanha] == st.session_state.campanha_selecionada]
+                titulo = f"Status - {st.session_state.campanha_selecionada[:30]}..."
+            else:
+                df_filtrado = df_kpi
+                titulo = 'Distribuição Geral'
+            
+            status_dist = df_filtrado['Status'].value_counts().reset_index()
             status_dist.columns = ['Status', 'Quantidade']
-            df_status = status_dist
+            
+            if not status_dist.empty:
+                fig_status = px.pie(
+                    status_dist,
+                    values='Quantidade',
+                    names='Status',
+                    title=titulo,
+                    color_discrete_sequence=['#003366', '#00A3E0', '#FF6600', '#28A745', '#6C757D'],
+                    template=plotly_template,
+                    hole=0.4
+                )
+                
+                fig_status.update_traces(
+                    textposition='outside', 
+                    textinfo='percent+label',
+                    textfont=dict(size=11, color=text_color),
+                    marker=dict(line=dict(color='white', width=2)),
+                    hovertemplate='<b>%{label}</b><br>Quantidade: %{value}<br>Percentual: %{percent}<extra></extra>'
+                )
+                
+                fig_status.update_layout(
+                    height=400,
+                    font=dict(color=text_color),
+                    paper_bgcolor='rgba(0,0,0,0)',
+                    plot_bgcolor='rgba(0,0,0,0)',
+                    showlegend=True,
+                    legend=dict(
+                        orientation='h',
+                        yanchor='bottom',
+                        y=1.02,
+                        xanchor='right',
+                        x=1
+                    )
+                )
+                st.plotly_chart(fig_status, use_container_width=True, config={'displayModeBar': False})
+                
+                # Mostrar métricas adicionais quando uma campanha está selecionada
+                if st.session_state.campanha_selecionada:
+                    col_m1, col_m2 = st.columns(2)
+                    with col_m1:
+                        st.metric("Total Demandas", len(df_filtrado))
+                    with col_m2:
+                        concluidas = len(df_filtrado[df_filtrado['Status'].str.contains('Concluído|Aprovado', na=False, case=False)])
+                        taxa = (concluidas / len(df_filtrado) * 100) if len(df_filtrado) > 0 else 0
+                        st.metric("Taxa Conclusão", f"{taxa:.1f}%")
+            else:
+                st.info(f"ℹ️ Sem dados de status para esta campanha")
         else:
             status_data = {
                 'Status': ['Aprovado', 'Em Produção', 'Aguardando Aprovação', 'Concluído'],
                 'Quantidade': [124, 89, 67, 45]
             }
             df_status = pd.DataFrame(status_data)
-        
-        fig_status = px.pie(
-            df_status,
-            values='Quantidade',
-            names='Status',
-            title='Demandas por Status',
-            color_discrete_sequence=['#003366', '#00A3E0', '#FF6600', '#28A745'],
-            template=plotly_template,
-            hole=0.4
-        )
-        
-        fig_status.update_traces(
-            textposition='outside', 
-            textinfo='percent+label',
-            textfont=dict(size=12, color=text_color),
-            marker=dict(line=dict(color='rgba(0,0,0,0)', width=0))
-        )
-        
-        fig_status.update_layout(
-            height=400,
-            font=dict(color=text_color),
-            paper_bgcolor='rgba(0,0,0,0)',
-            plot_bgcolor='rgba(0,0,0,0)',
-            showlegend=True,
-            legend=dict(
-                orientation='h',
-                yanchor='bottom',
-                y=1.02,
-                xanchor='right',
-                x=1
+            
+            fig_status = px.pie(
+                df_status,
+                values='Quantidade',
+                names='Status',
+                title='Demandas por Status (Exemplo)',
+                color_discrete_sequence=['#003366', '#00A3E0', '#FF6600', '#28A745'],
+                template=plotly_template,
+                hole=0.4
             )
-        )
-        st.plotly_chart(fig_status, use_container_width=True, config={'displayModeBar': False})
-    
-    st.divider()
-    
-    # ========== TABELA DE DEMANDAS ==========
-    st.markdown("""
-    <div class="info-container-cocred">
-        <p style="margin: 0; font-size: 14px;">
-            <strong>📋 Demandas por Tipo de Atividade</strong> - Detalhamento do volume por tipo, com classificação.
-        </p>
-    </div>
-    """, unsafe_allow_html=True)
-    
-    if 'Tipo Atividade' in df_kpi.columns:
-        tipo_counts = df_kpi['Tipo Atividade'].value_counts().head(8).reset_index()
-        tipo_counts.columns = ['Tipo de Atividade', 'Quantidade']
-        tipo_counts['% do Total'] = (tipo_counts['Quantidade'] / total_kpi * 100).round(1).astype(str) + '%'
-        
-        def get_status(qtd):
-            if qtd > 100:
-                return '✅ Alto volume'
-            elif qtd > 50:
-                return '⚠️ Médio volume'
-            else:
-                return '🟡 Baixo volume'
-        
-        tipo_counts['Status'] = tipo_counts['Quantidade'].apply(get_status)
-        
-        st.dataframe(
-            tipo_counts,
-            use_container_width=True,
-            height=350,
-            hide_index=True,
-            column_config={
-                "Tipo de Atividade": "📌 Tipo",
-                "Quantidade": "🔢 Quantidade",
-                "% do Total": "📊 %",
-                "Status": "🚦 Classificação"
-            }
-        )
-    else:
-        demandas_exemplo = pd.DataFrame({
-            'Tipo de Atividade': ['Evento', 'Comunicado', 'Campanha Orgânica', 
-                                  'Divulgação de Produto', 'Campanha de Incentivo', 
-                                  'E-mail Marketing', 'Redes Sociais', 'Landing Page'],
-            'Quantidade': [124, 89, 67, 45, 34, 28, 21, 15],
-            '% do Total': ['32%', '23%', '17%', '12%', '9%', '7%', '5%', '4%'],
-            'Status': ['✅ Alto volume', '✅ Alto volume', '⚠️ Médio volume', 
-                      '⚠️ Médio volume', '🟡 Baixo volume', '🟡 Baixo volume', 
-                      '🟡 Baixo volume', '🟡 Baixo volume']
-        })
-        st.dataframe(demandas_exemplo, use_container_width=True, height=350, hide_index=True)
+            
+            fig_status.update_traces(
+                textposition='outside', 
+                textinfo='percent+label',
+                textfont=dict(size=12, color=text_color),
+                marker=dict(line=dict(color='rgba(0,0,0,0)', width=0))
+            )
+            
+            fig_status.update_layout(
+                height=400,
+                font=dict(color=text_color),
+                paper_bgcolor='rgba(0,0,0,0)',
+                plot_bgcolor='rgba(0,0,0,0)',
+                showlegend=True,
+                legend=dict(
+                    orientation='h',
+                    yanchor='bottom',
+                    y=1.02,
+                    xanchor='right',
+                    x=1
+                )
+            )
+            st.plotly_chart(fig_status, use_container_width=True, config={'displayModeBar': False})
 
 # =========================================================
 # TAB 3: EXPLORADOR DE DADOS (NOVA VERSÃO OTIMIZADA!)
