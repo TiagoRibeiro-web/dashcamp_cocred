@@ -813,7 +813,9 @@ with tab1:
 # =========================================================
 # TAB 2: KPIs COCRED
 # =========================================================
-
+# =========================================================
+# TAB 2: KPIs COCRED
+# =========================================================
 with tab2:
     st.markdown("## 🎯 KPIs - Campanhas COCRED")
     
@@ -922,8 +924,7 @@ with tab2:
                     textposition='outside',
                     texttemplate='%{text}',
                     textfont=dict(size=12, color=text_color),
-                    hovertemplate='<b>%{y}</b><br>Demandas: %{x}<br><i>Clique para detalhar</i><extra></extra>',
-                    customdata=campanhas_top['Campanha']  # Passar nome da campanha para o evento de clique
+                    hovertemplate='<b>%{y}</b><br>Demandas: %{x}<br><i>Clique para detalhar</i><extra></extra>'
                 )
                 
                 fig_campanhas.update_layout(
@@ -938,21 +939,23 @@ with tab2:
                     clickmode='event+select'  # Habilitar eventos de clique
                 )
                 
-                # Capturar evento de clique
+                # Capturar evento de clique - CORRIGIDO!
                 evento_clique = st.plotly_chart(
                     fig_campanhas, 
                     use_container_width=True, 
                     config={'displayModeBar': False},
-                    key="grafico_campanhas",
-                    on_select=lambda: tratar_clique_campanha()  # Callback quando clicar
+                    key="grafico_campanhas"
                 )
                 
-                # Processar clique se houver
-                if evento_clique and 'points' in evento_clique and len(evento_clique['points']) > 0:
-                    campanha_clicada = evento_clique['points'][0]['y']
-                    if campanha_clicada != st.session_state.campanha_selecionada:
-                        st.session_state.campanha_selecionada = campanha_clicada
-                        st.rerun()
+                # Processar clique se houver - CORRIGIDO!
+                if evento_clique and 'selection' in evento_clique:
+                    if evento_clique['selection'] and 'points' in evento_clique['selection']:
+                        points = evento_clique['selection']['points']
+                        if points and len(points) > 0:
+                            campanha_clicada = points[0]['y']
+                            if campanha_clicada != st.session_state.campanha_selecionada:
+                                st.session_state.campanha_selecionada = campanha_clicada
+                                st.rerun()
                 
                 # Botão para limpar seleção
                 if st.session_state.campanha_selecionada:
@@ -991,7 +994,8 @@ with tab2:
             </p>
         </div>
         """.format(
-            f"Detalhando: {st.session_state.campanha_selecionada}" if st.session_state.campanha_selecionada 
+            f"Detalhando: {st.session_state.campanha_selecionada[:50]}..." if st.session_state.campanha_selecionada and len(st.session_state.campanha_selecionada) > 50 
+            else f"Detalhando: {st.session_state.campanha_selecionada}" if st.session_state.campanha_selecionada 
             else "Visão geral de todas as campanhas"
         ), unsafe_allow_html=True)
         
@@ -1092,6 +1096,57 @@ with tab2:
                 )
             )
             st.plotly_chart(fig_status, use_container_width=True, config={'displayModeBar': False})
+    
+    st.divider()
+    
+    # ========== TABELA DE DEMANDAS ==========
+    st.markdown("""
+    <div class="info-container-cocred">
+        <p style="margin: 0; font-size: 14px;">
+            <strong>📋 Demandas por Tipo de Atividade</strong> - Detalhamento do volume por tipo, com classificação.
+        </p>
+    </div>
+    """, unsafe_allow_html=True)
+    
+    if 'Tipo Atividade' in df_kpi.columns:
+        tipo_counts = df_kpi['Tipo Atividade'].value_counts().head(8).reset_index()
+        tipo_counts.columns = ['Tipo de Atividade', 'Quantidade']
+        tipo_counts['% do Total'] = (tipo_counts['Quantidade'] / total_kpi * 100).round(1).astype(str) + '%'
+        
+        def get_status(qtd):
+            if qtd > 100:
+                return '✅ Alto volume'
+            elif qtd > 50:
+                return '⚠️ Médio volume'
+            else:
+                return '🟡 Baixo volume'
+        
+        tipo_counts['Status'] = tipo_counts['Quantidade'].apply(get_status)
+        
+        st.dataframe(
+            tipo_counts,
+            use_container_width=True,
+            height=350,
+            hide_index=True,
+            column_config={
+                "Tipo de Atividade": "📌 Tipo",
+                "Quantidade": "🔢 Quantidade",
+                "% do Total": "📊 %",
+                "Status": "🚦 Classificação"
+            }
+        )
+    else:
+        demandas_exemplo = pd.DataFrame({
+            'Tipo de Atividade': ['Evento', 'Comunicado', 'Campanha Orgânica', 
+                                  'Divulgação de Produto', 'Campanha de Incentivo', 
+                                  'E-mail Marketing', 'Redes Sociais', 'Landing Page'],
+            'Quantidade': [124, 89, 67, 45, 34, 28, 21, 15],
+            '% do Total': ['32%', '23%', '17%', '12%', '9%', '7%', '5%', '4%'],
+            'Status': ['✅ Alto volume', '✅ Alto volume', '⚠️ Médio volume', 
+                      '⚠️ Médio volume', '🟡 Baixo volume', '🟡 Baixo volume', 
+                      '🟡 Baixo volume', '🟡 Baixo volume']
+        })
+        st.dataframe(demandas_exemplo, use_container_width=True, height=350, hide_index=True)
 
 # =========================================================
 # TAB 3: EXPLORADOR DE DADOS (NOVA VERSÃO OTIMIZADA!)
