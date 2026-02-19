@@ -619,185 +619,209 @@ with tab1:
     
     st.divider()
     
-    # ========== 3. ANÁLISE TEMPORAL ==========
-    # ========== 3. ANÁLISE TEMPORAL MELHORADA ==========
-if 'Data de Solicitação' in df.columns:
-    st.markdown("""
-    <div class="info-container-cocred">
-        <p style="margin: 0; font-size: 14px;">
-            <strong>📅 Análise Temporal Completa</strong> - Evolução, comparações e tendências.
-        </p>
-    </div>
-    """, unsafe_allow_html=True)
-    
-    # Preparar dados temporais
-    df['Mês/Ano'] = df['Data de Solicitação'].dt.to_period('M').astype(str)
-    df['Ano'] = df['Data de Solicitação'].dt.year
-    df['Mês'] = df['Data de Solicitação'].dt.month
-    df['Dia da Semana'] = df['Data de Solicitação'].dt.day_name()
-    
-    # Métricas por período
-    hoje = datetime.now().date()
-    mes_atual = hoje.month
-    ano_atual = hoje.year
-    
-    # Últimos 12 meses
-    ultimos_12_meses = df[df['Data de Solicitação'].dt.date >= (hoje - timedelta(days=365))].copy()
-    evolucao_mensal = ultimos_12_meses.groupby('Mês/Ano').size().reset_index()
-    evolucao_mensal.columns = ['Período', 'Quantidade']
-    
-    # Layout: 3 colunas de métricas no topo
-    col_temp1, col_temp2, col_temp3, col_temp4 = st.columns(4)
-    
-    with col_temp1:
-        total_ano = len(df[df['Ano'] == ano_atual])
-        st.metric(
-            label=f"📊 Total {ano_atual}", 
-            value=total_ano,
-            help="Total de solicitações no ano atual"
-        )
-    
-    with col_temp2:
-        if len(evolucao_mensal) >= 2:
-            ultimo_mes = evolucao_mensal.iloc[-1]['Quantidade']
-            penultimo_mes = evolucao_mensal.iloc[-2]['Quantidade']
-            variacao_mensal = ((ultimo_mes - penultimo_mes) / penultimo_mes * 100) if penultimo_mes > 0 else 0
-            st.metric(
-                label="📈 Vs Mês Anterior", 
-                value=ultimo_mes,
-                delta=f"{variacao_mensal:+.1f}%",
-                help="Comparação com o mês anterior"
-            )
-    
-    with col_temp3:
-        if len(evolucao_mensal) >= 12:
-            mesmo_mes_ano_anterior = evolucao_mensal[evolucao_mensal['Período'].str.contains(f"{ano_atual-1}-{mes_atual:02d}")]['Quantidade'].values
-            if len(mesmo_mes_ano_anterior) > 0:
-                variacao_anual = ((ultimo_mes - mesmo_mes_ano_anterior[0]) / mesmo_mes_ano_anterior[0] * 100) if mesmo_mes_ano_anterior[0] > 0 else 0
-                st.metric(
-                    label="📊 Vs Ano Anterior", 
-                    value=f"{variacao_anual:+.1f}%",
-                    help=f"Comparação com {mes_atual}/{ano_atual-1}"
-                )
-    
-    with col_temp4:
-        media_mensal = evolucao_mensal['Quantidade'].mean()
-        st.metric(
-            label="📊 Média Mensal", 
-            value=f"{media_mensal:.0f}",
-            help="Média de solicitações por mês (últimos 12 meses)"
-        )
-    
-    # Gráfico principal
-    col_graf1, col_graf2 = st.columns([3, 1])
-    
-    with col_graf1:
-        fig_evolucao = px.line(
-            evolucao_mensal.tail(12),
-            x='Período',
-            y='Quantidade',
-            title='📈 Evolução Mensal (últimos 12 meses)',
-            markers=True,
-            line_shape='linear',
-            template=plotly_template
-        )
-        
-        # Adicionar linha de média
-        fig_evolucao.add_hline(
-            y=media_mensal, 
-            line_dash="dash", 
-            line_color="#FF6600",
-            annotation_text=f"Média: {media_mensal:.0f}",
-            annotation_position="bottom right"
-        )
-        
-        fig_evolucao.update_traces(
-            line_color='#003366', 
-            line_width=3, 
-            marker=dict(color='#00A3E0', size=10)
-        )
-        
-        fig_evolucao.update_layout(
-            height=400,
-            xaxis_title="",
-            yaxis_title="Número de Solicitações",
-            font=dict(color=text_color),
-            paper_bgcolor='rgba(0,0,0,0)',
-            plot_bgcolor='rgba(0,0,0,0)'
-        )
-        st.plotly_chart(fig_evolucao, use_container_width=True, config={'displayModeBar': False})
-    
-    with col_graf2:
-        # Top 3 meses
-        top_meses = evolucao_mensal.nlargest(3, 'Quantidade')
-        
-        st.markdown(f"""
-        <div class="resumo-card" style="height: 400px;">
-            <h4 style="color: #003366; margin-top: 0;">🏆 Top 3 Meses</h4>
-            <div style="margin-top: 20px;">
-                <div style="background: linear-gradient(90deg, #FFD700 0%, #FFD700 80%, #f0f0f0 100%); 
-                            padding: 15px; border-radius: 10px; margin-bottom: 10px;">
-                    <p style="margin: 0; font-size: 18px; font-weight: bold;">🥇 {top_meses.iloc[0]['Período']}</p>
-                    <p style="margin: 0; font-size: 24px;">{top_meses.iloc[0]['Quantidade']} dem.</p>
-                </div>
-                <div style="background: linear-gradient(90deg, #C0C0C0 0%, #C0C0C0 60%, #f0f0f0 100%); 
-                            padding: 15px; border-radius: 10px; margin-bottom: 10px;">
-                    <p style="margin: 0; font-size: 18px; font-weight: bold;">🥈 {top_meses.iloc[1]['Período']}</p>
-                    <p style="margin: 0; font-size: 24px;">{top_meses.iloc[1]['Quantidade']} dem.</p>
-                </div>
-                <div style="background: linear-gradient(90deg, #CD7F32 0%, #CD7F32 40%, #f0f0f0 100%); 
-                            padding: 15px; border-radius: 10px;">
-                    <p style="margin: 0; font-size: 18px; font-weight: bold;">🥉 {top_meses.iloc[2]['Período']}</p>
-                    <p style="margin: 0; font-size: 24px;">{top_meses.iloc[2]['Quantidade']} dem.</p>
-                </div>
-            </div>
+    # ========== 3. ANÁLISE TEMPORAL COMPLETA (AGORA DENTRO DA TAB1!) ==========
+    if 'Data de Solicitação' in df.columns:
+        st.markdown("""
+        <div class="info-container-cocred">
+            <p style="margin: 0; font-size: 14px;">
+                <strong>📅 Análise Temporal Completa</strong> - Evolução, comparações e tendências.
+            </p>
         </div>
         """, unsafe_allow_html=True)
-    
-    # Análise de dia da semana (se houver dados suficientes)
-    if len(df) > 30:
-        st.divider()
         
-        with st.expander("📊 Análise por Dia da Semana", expanded=False):
-            dias_ordem = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday']
-            dias_pt = {
-                'Monday': 'Segunda', 'Tuesday': 'Terça', 'Wednesday': 'Quarta',
-                'Thursday': 'Quinta', 'Friday': 'Sexta', 'Saturday': 'Sábado', 'Sunday': 'Domingo'
-            }
-            
-            dias_analise = df['Dia da Semana'].value_counts().reset_index()
-            dias_analise.columns = ['Dia', 'Quantidade']
-            dias_analise['Dia'] = pd.Categorical(dias_analise['Dia'], categories=dias_ordem, ordered=True)
-            dias_analise = dias_analise.sort_values('Dia')
-            dias_analise['Dia PT'] = dias_analise['Dia'].map(dias_pt)
-            
-            fig_dias = px.bar(
-                dias_analise,
-                x='Dia PT',
-                y='Quantidade',
-                title='Distribuição por Dia da Semana',
-                color='Quantidade',
-                color_continuous_scale='Blues',
-                text='Quantidade',
-                template=plotly_template
+        # Preparar dados temporais (criar cópia para não modificar o df original fora da tab)
+        df_temp = df.copy()
+        df_temp['Mês/Ano'] = df_temp['Data de Solicitação'].dt.to_period('M').astype(str)
+        df_temp['Ano'] = df_temp['Data de Solicitação'].dt.year
+        df_temp['Mês'] = df_temp['Data de Solicitação'].dt.month
+        df_temp['Dia da Semana'] = df_temp['Data de Solicitação'].dt.day_name()
+        
+        # Métricas por período
+        hoje = datetime.now().date()
+        mes_atual = hoje.month
+        ano_atual = hoje.year
+        
+        # Últimos 12 meses
+        ultimos_12_meses = df_temp[df_temp['Data de Solicitação'].dt.date >= (hoje - timedelta(days=365))].copy()
+        evolucao_mensal = ultimos_12_meses.groupby('Mês/Ano').size().reset_index()
+        evolucao_mensal.columns = ['Período', 'Quantidade']
+        
+        # Layout: 4 colunas de métricas no topo
+        col_temp1, col_temp2, col_temp3, col_temp4 = st.columns(4)
+        
+        with col_temp1:
+            total_ano = len(df_temp[df_temp['Ano'] == ano_atual])
+            st.metric(
+                label=f"📊 Total {ano_atual}", 
+                value=total_ano,
+                help="Total de solicitações no ano atual"
             )
+        
+        with col_temp2:
+            if len(evolucao_mensal) >= 2:
+                ultimo_mes = evolucao_mensal.iloc[-1]['Quantidade']
+                penultimo_mes = evolucao_mensal.iloc[-2]['Quantidade']
+                variacao_mensal = ((ultimo_mes - penultimo_mes) / penultimo_mes * 100) if penultimo_mes > 0 else 0
+                st.metric(
+                    label="📈 Vs Mês Anterior", 
+                    value=ultimo_mes,
+                    delta=f"{variacao_mensal:+.1f}%",
+                    delta_color="normal",
+                    help="Comparação com o mês anterior"
+                )
+            else:
+                st.metric(label="📈 Vs Mês Anterior", value="N/A")
+        
+        with col_temp3:
+            if len(evolucao_mensal) >= 12:
+                # Procurar o mesmo mês do ano anterior
+                mesmo_mes_ano_anterior = evolucao_mensal[evolucao_mensal['Período'].str.contains(f"{ano_atual-1}-{mes_atual:02d}", na=False)]
+                if not mesmo_mes_ano_anterior.empty and len(evolucao_mensal) > 0:
+                    ultimo_mes = evolucao_mensal.iloc[-1]['Quantidade']
+                    valor_ano_anterior = mesmo_mes_ano_anterior.iloc[0]['Quantidade']
+                    variacao_anual = ((ultimo_mes - valor_ano_anterior) / valor_ano_anterior * 100) if valor_ano_anterior > 0 else 0
+                    st.metric(
+                        label="📊 Vs Ano Anterior", 
+                        value=f"{variacao_anual:+.1f}%",
+                        delta_color="normal",
+                        help=f"Comparação com {mes_atual}/{ano_atual-1}"
+                    )
+                else:
+                    st.metric(label="📊 Vs Ano Anterior", value="N/A")
+            else:
+                st.metric(label="📊 Vs Ano Anterior", value="N/A")
+        
+        with col_temp4:
+            if not evolucao_mensal.empty:
+                media_mensal = evolucao_mensal['Quantidade'].mean()
+                st.metric(
+                    label="📊 Média Mensal", 
+                    value=f"{media_mensal:.0f}",
+                    help="Média de solicitações por mês (últimos 12 meses)"
+                )
+            else:
+                st.metric(label="📊 Média Mensal", value="N/A")
+        
+        # Gráfico principal
+        if not evolucao_mensal.empty:
+            col_graf1, col_graf2 = st.columns([3, 1])
             
-            fig_dias.update_traces(
-                textposition='outside',
-                texttemplate='%{text}',
-                textfont=dict(size=12, color=text_color)
-            )
+            with col_graf1:
+                fig_evolucao = px.line(
+                    evolucao_mensal.tail(12),
+                    x='Período',
+                    y='Quantidade',
+                    title='📈 Evolução Mensal (últimos 12 meses)',
+                    markers=True,
+                    line_shape='linear',
+                    template=plotly_template
+                )
+                
+                # Adicionar linha de média
+                media_mensal = evolucao_mensal['Quantidade'].mean()
+                fig_evolucao.add_hline(
+                    y=media_mensal, 
+                    line_dash="dash", 
+                    line_color="#FF6600",
+                    annotation_text=f"Média: {media_mensal:.0f}",
+                    annotation_position="bottom right"
+                )
+                
+                fig_evolucao.update_traces(
+                    line_color='#003366', 
+                    line_width=3, 
+                    marker=dict(color='#00A3E0', size=10)
+                )
+                
+                fig_evolucao.update_layout(
+                    height=400,
+                    xaxis_title="",
+                    yaxis_title="Número de Solicitações",
+                    font=dict(color=text_color),
+                    paper_bgcolor='rgba(0,0,0,0)',
+                    plot_bgcolor='rgba(0,0,0,0)'
+                )
+                st.plotly_chart(fig_evolucao, use_container_width=True, config={'displayModeBar': False})
             
-            fig_dias.update_layout(
-                height=350,
-                xaxis_title="",
-                yaxis_title="Número de Solicitações",
-                showlegend=False,
-                font=dict(color=text_color),
-                paper_bgcolor='rgba(0,0,0,0)',
-                plot_bgcolor='rgba(0,0,0,0)'
-            )
-            st.plotly_chart(fig_dias, use_container_width=True, config={'displayModeBar': False})
+            with col_graf2:
+                # Top 3 meses
+                if len(evolucao_mensal) >= 3:
+                    top_meses = evolucao_mensal.nlargest(3, 'Quantidade')
+                    
+                    st.markdown(f"""
+                    <div class="resumo-card" style="height: 400px;">
+                        <h4 style="color: #003366; margin-top: 0;">🏆 Top 3 Meses</h4>
+                        <div style="margin-top: 20px;">
+                            <div style="background: linear-gradient(90deg, #FFD700 0%, #FFD700 80%, #f0f0f0 100%); 
+                                        padding: 15px; border-radius: 10px; margin-bottom: 10px;">
+                                <p style="margin: 0; font-size: 18px; font-weight: bold;">🥇 {top_meses.iloc[0]['Período']}</p>
+                                <p style="margin: 0; font-size: 24px;">{top_meses.iloc[0]['Quantidade']} dem.</p>
+                            </div>
+                            <div style="background: linear-gradient(90deg, #C0C0C0 0%, #C0C0C0 60%, #f0f0f0 100%); 
+                                        padding: 15px; border-radius: 10px; margin-bottom: 10px;">
+                                <p style="margin: 0; font-size: 18px; font-weight: bold;">🥈 {top_meses.iloc[1]['Período']}</p>
+                                <p style="margin: 0; font-size: 24px;">{top_meses.iloc[1]['Quantidade']} dem.</p>
+                            </div>
+                            <div style="background: linear-gradient(90deg, #CD7F32 0%, #CD7F32 40%, #f0f0f0 100%); 
+                                        padding: 15px; border-radius: 10px;">
+                                <p style="margin: 0; font-size: 18px; font-weight: bold;">🥉 {top_meses.iloc[2]['Período']}</p>
+                                <p style="margin: 0; font-size: 24px;">{top_meses.iloc[2]['Quantidade']} dem.</p>
+                            </div>
+                        </div>
+                    </div>
+                    """, unsafe_allow_html=True)
+                else:
+                    st.markdown(f"""
+                    <div class="resumo-card" style="height: 400px;">
+                        <h4 style="color: #003366; margin-top: 0;">🏆 Top Meses</h4>
+                        <p style="text-align: center; margin-top: 150px; color: #6C757D;">Dados insuficientes</p>
+                    </div>
+                    """, unsafe_allow_html=True)
+        
+        # Análise de dia da semana (se houver dados suficientes)
+        if len(df_temp) > 30:
+            st.divider()
+            
+            with st.expander("📊 Análise por Dia da Semana", expanded=False):
+                dias_ordem = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday']
+                dias_pt = {
+                    'Monday': 'Segunda', 'Tuesday': 'Terça', 'Wednesday': 'Quarta',
+                    'Thursday': 'Quinta', 'Friday': 'Sexta', 'Saturday': 'Sábado', 'Sunday': 'Domingo'
+                }
+                
+                dias_analise = df_temp['Dia da Semana'].value_counts().reset_index()
+                dias_analise.columns = ['Dia', 'Quantidade']
+                dias_analise['Dia'] = pd.Categorical(dias_analise['Dia'], categories=dias_ordem, ordered=True)
+                dias_analise = dias_analise.sort_values('Dia')
+                dias_analise['Dia PT'] = dias_analise['Dia'].map(dias_pt)
+                
+                fig_dias = px.bar(
+                    dias_analise,
+                    x='Dia PT',
+                    y='Quantidade',
+                    title='Distribuição por Dia da Semana',
+                    color='Quantidade',
+                    color_continuous_scale='Blues',
+                    text='Quantidade',
+                    template=plotly_template
+                )
+                
+                fig_dias.update_traces(
+                    textposition='outside',
+                    texttemplate='%{text}',
+                    textfont=dict(size=12, color=text_color)
+                )
+                
+                fig_dias.update_layout(
+                    height=350,
+                    xaxis_title="",
+                    yaxis_title="Número de Solicitações",
+                    showlegend=False,
+                    font=dict(color=text_color),
+                    paper_bgcolor='rgba(0,0,0,0)',
+                    plot_bgcolor='rgba(0,0,0,0)'
+                )
+                st.plotly_chart(fig_dias, use_container_width=True, config={'displayModeBar': False})
 # =========================================================
 # TAB 2: KPIs COCRED
 # =========================================================
