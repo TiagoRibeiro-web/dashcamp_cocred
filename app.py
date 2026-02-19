@@ -844,19 +844,60 @@ with tab2:
                 df_kpi = df_kpi[df_kpi['Prioridade'] == prioridade_filtro]
     
     with col_filtro_kpi3:
-        periodo_kpi = st.selectbox("📅 Período:", ["Todo período", "Últimos 30 dias", "Últimos 90 dias", "Este ano"], key="kpi_periodo")
+        periodo_kpi = st.selectbox(
+            "📅 Período:", 
+            ["Todo período", "Últimos 30 dias", "Últimos 90 dias", "Este ano", "Quinzena"], 
+            key="kpi_periodo"
+        )
         
         if periodo_kpi != "Todo período" and 'Data de Solicitação' in df_kpi.columns:
             hoje = datetime.now().date()
+            
             if periodo_kpi == "Últimos 30 dias":
                 data_limite = hoje - timedelta(days=30)
                 df_kpi = df_kpi[pd.to_datetime(df_kpi['Data de Solicitação']).dt.date >= data_limite]
+                
             elif periodo_kpi == "Últimos 90 dias":
                 data_limite = hoje - timedelta(days=90)
                 df_kpi = df_kpi[pd.to_datetime(df_kpi['Data de Solicitação']).dt.date >= data_limite]
+                
             elif periodo_kpi == "Este ano":
                 data_limite = hoje.replace(month=1, day=1)
                 df_kpi = df_kpi[pd.to_datetime(df_kpi['Data de Solicitação']).dt.date >= data_limite]
+                
+            elif periodo_kpi == "Quinzena":
+                # Opção para escolher a quinzena
+                quinzena_opcao = st.radio(
+                    "Escolha a quinzena:",
+                    ["Primeira quinzena (dias 1-15)", "Segunda quinzena (dias 16-31)"],
+                    horizontal=True,
+                    key="kpi_quinzena_opcao"
+                )
+                
+                ano_atual = hoje.year
+                mes_atual = hoje.month
+                
+                if quinzena_opcao == "Primeira quinzena (dias 1-15)":
+                    # Primeira quinzena: dias 1 a 15 do mês atual
+                    data_inicio_quinzena = date(ano_atual, mes_atual, 1)
+                    data_fim_quinzena = date(ano_atual, mes_atual, 15)
+                else:
+                    # Segunda quinzena: dia 16 até último dia do mês
+                    ultimo_dia = (date(ano_atual, mes_atual, 1) + timedelta(days=32)).replace(day=1) - timedelta(days=1)
+                    data_inicio_quinzena = date(ano_atual, mes_atual, 16)
+                    data_fim_quinzena = ultimo_dia
+                
+                # Aplicar filtro de quinzena
+                data_inicio_ts = pd.Timestamp(data_inicio_quinzena)
+                data_fim_ts = pd.Timestamp(data_fim_quinzena) + pd.Timedelta(days=1) - pd.Timedelta(seconds=1)
+                
+                df_kpi = df_kpi[
+                    (df_kpi['Data de Solicitação'] >= data_inicio_ts) & 
+                    (df_kpi['Data de Solicitação'] <= data_fim_ts)
+                ]
+                
+                # Mostrar informação da quinzena selecionada
+                st.caption(f"📅 Período selecionado: {data_inicio_quinzena.strftime('%d/%m')} a {data_fim_quinzena.strftime('%d/%m')}")
     
     total_kpi = len(df_kpi)
     st.divider()
@@ -1110,8 +1151,7 @@ with tab2:
     
     st.divider()
     
-    # ========== TABELA DE DEMANDAS ==========
-        # ========== TABELA DE DEMANDAS POR ORIGEM ==========
+    # ========== TABELA DE DEMANDAS POR ORIGEM ==========
     st.markdown("""
     <div class="info-container-cocred">
         <p style="margin: 0; font-size: 14px;">
