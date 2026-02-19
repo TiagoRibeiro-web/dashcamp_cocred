@@ -668,17 +668,7 @@ with tab1:
                     ultimo_mes = evolucao_mensal.iloc[-1]['Quantidade']
                     valor_ano_anterior = mesmo_mes_ano_anterior.iloc[0]['Quantidade']
                     variacao_anual = ((ultimo_mes - valor_ano_anterior) / valor_ano_anterior * 100) if valor_ano_anterior > 0 else 0
-            #         st.metric(
-            #             label="📊 Vs Ano Anterior", 
-            #             value=f"{variacao_anual:+.1f}%",
-            #             delta_color="normal",
-            #             help=f"Comparação com {mes_atual}/{ano_atual-1}"
-            #         )
-            #     else:
-            #         st.metric(label="📊 Vs Ano Anterior", value="N/A")
-            # else:
-            #     st.metric(label="📊 Vs Ano Anterior", value="N/A")
-        
+           
         with col_temp4:
             if not evolucao_mensal.empty:
                 media_mensal = evolucao_mensal['Quantidade'].mean()
