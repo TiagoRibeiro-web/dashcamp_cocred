@@ -1111,53 +1111,99 @@ with tab2:
     st.divider()
     
     # ========== TABELA DE DEMANDAS ==========
+        # ========== TABELA DE DEMANDAS POR ORIGEM ==========
     st.markdown("""
     <div class="info-container-cocred">
         <p style="margin: 0; font-size: 14px;">
-            <strong>📋 Demandas por Tipo de Atividade</strong> - Detalhamento do volume por tipo, com classificação.
+            <strong>📋 Demandas por Origem</strong> - Detalhamento do volume por origem, com classificação.
         </p>
     </div>
     """, unsafe_allow_html=True)
     
-    if 'Tipo Atividade' in df_kpi.columns:
-        tipo_counts = df_kpi['Tipo Atividade'].value_counts().head(8).reset_index()
-        tipo_counts.columns = ['Tipo de Atividade', 'Quantidade']
-        tipo_counts['% do Total'] = (tipo_counts['Quantidade'] / total_kpi * 100).round(1).astype(str) + '%'
+    # Procurar por coluna de Origem (várias possibilidades)
+    coluna_origem = None
+    possiveis_nomes_origem = ['Origem', 'origem', 'ORIGEM', 'Fonte', 'fonte', 'FONTE', 'Canal', 'canal']
+    
+    for col in df_kpi.columns:
+        if any(nome in col for nome in possiveis_nomes_origem):
+            coluna_origem = col
+            break
+    
+    if coluna_origem:
+        # Contar ocorrências por origem
+        origem_counts = df_kpi[coluna_origem].value_counts().head(8).reset_index()
+        origem_counts.columns = ['Origem', 'Quantidade']
         
-        def get_status(qtd):
-            if qtd > 100:
-                return '✅ Alto volume'
-            elif qtd > 50:
-                return '⚠️ Médio volume'
-            else:
-                return '🟡 Baixo volume'
+        # Filtrar valores nulos ou vazios
+        origem_counts = origem_counts[origem_counts['Origem'].notna()]
+        origem_counts = origem_counts[origem_counts['Origem'] != '']
         
-        tipo_counts['Status'] = tipo_counts['Quantidade'].apply(get_status)
-        
-        st.dataframe(
-            tipo_counts,
-            use_container_width=True,
-            height=350,
-            hide_index=True,
-            column_config={
-                "Tipo de Atividade": "📌 Tipo",
-                "Quantidade": "🔢 Quantidade",
-                "% do Total": "📊 %",
-                "Status": "🚦 Classificação"
-            }
-        )
+        if not origem_counts.empty:
+            # Calcular percentual
+            total_origem = origem_counts['Quantidade'].sum()
+            origem_counts['% do Total'] = (origem_counts['Quantidade'] / total_kpi * 100).round(1).astype(str) + '%'
+            
+            # Classificar volume
+            def get_status(qtd):
+                if qtd > 100:
+                    return '✅ Alto volume'
+                elif qtd > 50:
+                    return '⚠️ Médio volume'
+                elif qtd > 20:
+                    return '🟡 Médio-Baixo'
+                else:
+                    return '⚪ Baixo volume'
+            
+            origem_counts['Status'] = origem_counts['Quantidade'].apply(get_status)
+            
+            # Mostrar tabela
+            st.dataframe(
+                origem_counts,
+                use_container_width=True,
+                height=350,
+                hide_index=True,
+                column_config={
+                    "Origem": "📌 Origem",
+                    "Quantidade": "🔢 Quantidade",
+                    "% do Total": "📊 %",
+                    "Status": "🚦 Classificação"
+                }
+            )
+            
+            # Métricas rápidas sobre origens
+            col_orig1, col_orig2, col_orig3 = st.columns(3)
+            with col_orig1:
+                st.metric("Total Origens", len(origem_counts))
+            with col_orig2:
+                st.metric("Total Demandas", origem_counts['Quantidade'].sum())
+            with col_orig3:
+                media_origem = origem_counts['Quantidade'].mean()
+                st.metric("Média por Origem", f"{media_origem:.0f}")
+        else:
+            st.info("ℹ️ Dados de origem não disponíveis")
+            
+            if st.session_state.get('debug_mode', False):
+                st.caption(f"📋 Coluna encontrada: {coluna_origem}, mas sem dados válidos")
     else:
-        demandas_exemplo = pd.DataFrame({
-            'Tipo de Atividade': ['Evento', 'Comunicado', 'Campanha Orgânica', 
-                                  'Divulgação de Produto', 'Campanha de Incentivo', 
-                                  'E-mail Marketing', 'Redes Sociais', 'Landing Page'],
-            'Quantidade': [124, 89, 67, 45, 34, 28, 21, 15],
-            '% do Total': ['32%', '23%', '17%', '12%', '9%', '7%', '5%', '4%'],
-            'Status': ['✅ Alto volume', '✅ Alto volume', '⚠️ Médio volume', 
-                      '⚠️ Médio volume', '🟡 Baixo volume', '🟡 Baixo volume', 
-                      '🟡 Baixo volume', '🟡 Baixo volume']
+        # Fallback com dados de exemplo
+        st.info("ℹ️ Coluna 'Origem' não encontrada. Usando dados de exemplo...")
+        
+        if st.session_state.get('debug_mode', False):
+            st.caption("📋 Colunas disponíveis no DataFrame:")
+            st.write(df_kpi.columns.tolist())
+        
+        # Dados de exemplo
+        origem_exemplo = pd.DataFrame({
+            'Origem': ['Marketing Digital', 'Indicação', 'Redes Sociais', 
+                      'E-mail Marketing', 'Evento', 'Site', 'WhatsApp', 'Telefone'],
+            'Quantidade': [145, 98, 76, 54, 43, 32, 28, 15],
+            '% do Total': ['32%', '22%', '17%', '12%', '10%', '7%', '6%', '4%'],
+            'Status': ['✅ Alto volume', '⚠️ Médio volume', '⚠️ Médio volume', 
+                      '🟡 Médio-Baixo', '🟡 Médio-Baixo', '⚪ Baixo volume', 
+                      '⚪ Baixo volume', '⚪ Baixo volume']
         })
-        st.dataframe(demandas_exemplo, use_container_width=True, height=350, hide_index=True)
+        
+        st.dataframe(origem_exemplo, use_container_width=True, height=350, hide_index=True)
 
 # =========================================================
 # TAB 3: EXPLORADOR DE DADOS (NOVA VERSÃO OTIMIZADA!)
