@@ -546,125 +546,7 @@ with tab1:
     
     st.divider()
     
-    # ========== 2. ANÁLISE POR STATUS ==========
-    st.markdown("""
-    <div class="info-container-cocred">
-        <p style="margin: 0; font-size: 14px;">
-            <strong>📊 Fluxo de Trabalho</strong> - Distribuição das demandas por estágio e gargalos.
-        </p>
-    </div>
-    """, unsafe_allow_html=True)
-    
-    col_status1, col_status2 = st.columns([2, 1])
-    
-    with col_status1:
-        if 'Status' in df.columns:
-            status_counts = df['Status'].value_counts().reset_index()
-            status_counts.columns = ['Status', 'Quantidade']
-            
-            ordem_status = ['Aguardando Aprovação', 'Em Produção', 'Aprovado', 'Concluído', 'Solicitação de Ajustes']
-            status_counts['Status'] = pd.Categorical(status_counts['Status'], categories=ordem_status, ordered=True)
-            status_counts = status_counts.sort_values('Status')
-            
-            fig_status = px.bar(
-                status_counts,
-                x='Quantidade',
-                y='Status',
-                orientation='h',
-                title='Demandas por Status',
-                color='Quantidade',
-                color_continuous_scale='Blues',
-                text='Quantidade',
-                template=plotly_template
-            )
-            
-            fig_status.update_traces(
-                textposition='outside',
-                texttemplate='%{text}',
-                textfont=dict(size=12, color=text_color)
-            )
-            
-            fig_status.update_layout(
-                height=400,
-                xaxis_title="Quantidade",
-                yaxis_title="",
-                showlegend=False,
-                font=dict(color=text_color),
-                paper_bgcolor='rgba(0,0,0,0)',
-                plot_bgcolor='rgba(0,0,0,0)'
-            )
-            st.plotly_chart(fig_status, use_container_width=True, config={'displayModeBar': False})
-    
-    with col_status2:
-        if 'Status' in df.columns:
-            # Mapeamento exato dos status
-            status_map = {
-                'aguardando': ['Aguardando Aprovação', 'Aguardando'],
-                'producao': ['Em Produção', 'Produção'],
-                'aprovado': ['Aprovado'],
-                'concluido': ['Concluído', 'Finalizado']
-            }
-            
-            # Contagem com correspondência exata
-            aguardando = len(df[df['Status'].isin(status_map['aguardando'])])
-            producao = len(df[df['Status'].isin(status_map['producao'])])
-            aprovado = len(df[df['Status'].isin(status_map['aprovado'])])
-            concluido = len(df[df['Status'].isin(status_map['concluido'])])
-            
-            # Demais status (para referência)
-            outros = total_linhas - (aguardando + producao + aprovado + concluido)
-            
-            # Identificação mais precisa do gargalo
-            if producao > aguardando and producao > aprovado:
-                gargalo = '⚙️ Em Produção'
-                gargalo_valor = producao
-                gargalo_desc = "Mais demandas em produção do que aguardando ou aprovadas"
-            elif aguardando > producao and aguardando > aprovado:
-                gargalo = '⏳ Aguardando Aprovação'
-                gargalo_valor = aguardando
-                gargalo_desc = "Gargalo na aprovação - demandas paradas aguardando"
-            elif aprovado > producao and aprovado > aguardando:
-                gargalo = '✅ Aprovado'
-                gargalo_valor = aprovado
-                gargalo_desc = "Muitas demandas aprovadas aguardando produção"
-            else:
-                gargalo = '📊 Distribuído'
-                gargalo_valor = max(producao, aguardando, aprovado)
-                gargalo_desc = "Fluxo relativamente equilibrado"
-            
-            st.markdown(f"""
-            <div class="resumo-card">
-                <h4 style="color: #003366; margin-top: 0;">📋 Resumo do Fluxo</h4>
-                <div style="display: flex; justify-content: space-between; margin-bottom: 10px;">
-                    <span>⏳ Aguardando Aprovação:</span>
-                    <span style="font-weight: bold;">{aguardando}</span>
-                </div>
-                <div style="display: flex; justify-content: space-between; margin-bottom: 10px;">
-                    <span>⚙️ Em Produção:</span>
-                    <span style="font-weight: bold;">{producao}</span>
-                </div>
-                <div style="display: flex; justify-content: space-between; margin-bottom: 10px;">
-                    <span>✅ Aprovado:</span>
-                    <span style="font-weight: bold;">{aprovado}</span>
-                </div>
-                <div style="display: flex; justify-content: space-between; margin-bottom: 10px;">
-                    <span>🏁 Concluído:</span>
-                    <span style="font-weight: bold;">{concluido}</span>
-                </div>
-                <div style="display: flex; justify-content: space-between; margin-bottom: 10px;">
-                    <span>📌 Outros:</span>
-                    <span style="font-weight: bold;">{outros}</span>
-                </div>
-                <div style="background: rgba(0, 51, 102, 0.1); padding: 15px; border-radius: 10px; margin-top: 15px;">
-                    <p style="margin: 0; color: #003366;">
-                        <strong>📌 Gargalo:</strong> {gargalo} ({gargalo_valor})<br>
-                        <small style="color: #6C757D;">{gargalo_desc}</small>
-                    </p>
-                </div>
-            </div>
-            """, unsafe_allow_html=True)
-    
-    # ========== 3. ANÁLISE POR SOLICITANTE ==========
+    # ========== 2. ANÁLISE POR SOLICITANTE ==========
     if 'Solicitante' in df.columns:
         st.markdown("""
         <div class="info-container-cocred">
@@ -737,7 +619,7 @@ with tab1:
     
     st.divider()
     
-    # ========== 4. ANÁLISE TEMPORAL ==========
+    # ========== 3. ANÁLISE TEMPORAL ==========
     if 'Data de Solicitação' in df.columns:
         st.markdown("""
         <div class="info-container-cocred">
@@ -799,87 +681,6 @@ with tab1:
                     </div>
                 </div>
                 """, unsafe_allow_html=True)
-    
-    st.divider()
-    
-    # ========== 5. ANÁLISE DE PRODUÇÃO ==========
-    if 'Produção' in df.columns:
-        st.markdown("""
-        <div class="info-container-cocred">
-            <p style="margin: 0; font-size: 14px;">
-                <strong>🏭 Distribuição Interna</strong> - Comparativo entre equipes Ideatore e Cocred.
-            </p>
-        </div>
-        """, unsafe_allow_html=True)
-        
-        col_prod1, col_prod2 = st.columns(2)
-        
-        with col_prod1:
-            producao_counts = df['Produção'].value_counts().reset_index()
-            producao_counts.columns = ['Produção', 'Quantidade']
-            
-            fig_prod = px.pie(
-                producao_counts,
-                values='Quantidade',
-                names='Produção',
-                title='Demandas por Equipe',
-                color='Produção',
-                color_discrete_map={'Ideatore': '#003366', 'Cocred': '#00A3E0'},
-                template=plotly_template,
-                hole=0.4
-            )
-            
-            fig_prod.update_traces(
-                textposition='outside', 
-                textinfo='percent+label',
-                textfont=dict(size=12, color=text_color),
-                marker=dict(line=dict(color='rgba(0,0,0,0)', width=0))
-            )
-            
-            fig_prod.update_layout(
-                height=300,
-                font=dict(color=text_color),
-                paper_bgcolor='rgba(0,0,0,0)',
-                plot_bgcolor='rgba(0,0,0,0)',
-                showlegend=True,
-                legend=dict(
-                    orientation='h',
-                    yanchor='bottom',
-                    y=1.02,
-                    xanchor='right',
-                    x=1
-                )
-            )
-            st.plotly_chart(fig_prod, use_container_width=True, config={'displayModeBar': False})
-        
-        with col_prod2:
-            ideatore = producao_counts[producao_counts['Produção'].str.contains('Ideatore', na=False)]['Quantidade'].sum() if any(producao_counts['Produção'].str.contains('Ideatore', na=False)) else 0
-            cocred = producao_counts[producao_counts['Produção'].str.contains('Cocred', na=False)]['Quantidade'].sum() if any(producao_counts['Produção'].str.contains('Cocred', na=False)) else 0
-            total_prod = ideatore + cocred
-            
-            st.markdown(f"""
-            <div class="resumo-card" style="height: 300px;">
-                <h4 style="color: #003366; margin-top: 0;">⚖️ Comparativo</h4>
-                <div style="margin-top: 30px;">
-                    <div style="display: flex; justify-content: space-between; margin-bottom: 15px;">
-                        <span style="font-weight: bold; color: #003366;">🏭 Ideatore:</span>
-                        <span style="font-size: 24px; font-weight: bold; color: #003366;">{ideatore}</span>
-                    </div>
-                    <div style="display: flex; justify-content: space-between; margin-bottom: 15px;">
-                        <span style="font-weight: bold; color: #00A3E0;">🏢 Cocred:</span>
-                        <span style="font-size: 24px; font-weight: bold; color: #00A3E0;">{cocred}</span>
-                    </div>
-                    <div style="background: rgba(0, 51, 102, 0.1); padding: 15px; border-radius: 10px; margin-top: 30px;">
-                        <p style="margin: 0; color: #003366;">
-                            📊 <strong>Distribuição:</strong><br>
-                            Ideatore: {ideatore/total_prod*100:.0f}% | 
-                            Cocred: {cocred/total_prod*100:.0f}%
-                        </p>
-                    </div>
-                </div>
-            </div>
-            """, unsafe_allow_html=True)
-
 # =========================================================
 # TAB 2: KPIs COCRED
 # =========================================================
