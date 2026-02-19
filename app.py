@@ -1268,12 +1268,12 @@ with tab3:
             data_min = df['Data de Solicitação'].min().strftime('%d/%m/%Y')
             data_max = df['Data de Solicitação'].max().strftime('%d/%m/%Y')
             st.metric(
-                label="📅 Período", 
+                label="📅 Vigência", 
                 value=f"{data_min} a {data_max}",
                 help="Período coberto pelos dados"
             )
         else:
-            st.metric(label="📅 Período", value="N/A")
+            st.metric(label="📅 Vigência", value="N/A")
     
     # with col_stats3:
     #     if 'Status' in df.columns:
