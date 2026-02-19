@@ -1214,7 +1214,7 @@ with tab3:
     # =========================================================
     # HEADER COM ESTATÍSTICAS RÁPIDAS
     # =========================================================
-    col_stats1, col_stats2, col_stats3, col_stats4 = st.columns(4)
+    col_stats1, col_stats2, col_stats4 = st.columns(3)
     
     with col_stats1:
         st.metric(
