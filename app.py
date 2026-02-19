@@ -660,15 +660,25 @@ with tab1:
             else:
                 st.metric(label="📈 Vs Mês Anterior", value="N/A")
         
-        with col_temp3:
-            if len(evolucao_mensal) >= 12:
-                # Procurar o mesmo mês do ano anterior
-                mesmo_mes_ano_anterior = evolucao_mensal[evolucao_mensal['Período'].str.contains(f"{ano_atual-1}-{mes_atual:02d}", na=False)]
-                if not mesmo_mes_ano_anterior.empty and len(evolucao_mensal) > 0:
-                    ultimo_mes = evolucao_mensal.iloc[-1]['Quantidade']
-                    valor_ano_anterior = mesmo_mes_ano_anterior.iloc[0]['Quantidade']
-                    variacao_anual = ((ultimo_mes - valor_ano_anterior) / valor_ano_anterior * 100) if valor_ano_anterior > 0 else 0
-           
+        # with col_temp3:
+        #     if len(evolucao_mensal) >= 12:
+        #         # Procurar o mesmo mês do ano anterior
+        #         mesmo_mes_ano_anterior = evolucao_mensal[evolucao_mensal['Período'].str.contains(f"{ano_atual-1}-{mes_atual:02d}", na=False)]
+        #         if not mesmo_mes_ano_anterior.empty and len(evolucao_mensal) > 0:
+        #             ultimo_mes = evolucao_mensal.iloc[-1]['Quantidade']
+        #             valor_ano_anterior = mesmo_mes_ano_anterior.iloc[0]['Quantidade']
+        #             variacao_anual = ((ultimo_mes - valor_ano_anterior) / valor_ano_anterior * 100) if valor_ano_anterior > 0 else 0
+            #         st.metric(
+            #             label="📊 Vs Ano Anterior", 
+            #             value=f"{variacao_anual:+.1f}%",
+            #             delta_color="normal",
+            #             help=f"Comparação com {mes_atual}/{ano_atual-1}"
+            #         )
+            #     else:
+            #         st.metric(label="📊 Vs Ano Anterior", value="N/A")
+            # else:
+            #     st.metric(label="📊 Vs Ano Anterior", value="N/A")
+        
         with col_temp4:
             if not evolucao_mensal.empty:
                 media_mensal = evolucao_mensal['Quantidade'].mean()
