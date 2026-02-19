@@ -873,7 +873,7 @@ with tab2:
         st.markdown("""
         <div style="background: rgba(0, 51, 102, 0.1); padding: 10px; border-radius: 10px; margin-bottom: 10px;">
             <p style="margin: 0; font-size: 13px;">
-                <strong style="color: #003366;">🏆 Top 10 Campanhas</strong> - Clique em uma barra para detalhar no gráfico ao lado.
+                <strong style="color: #003366;">🏆 Top 10 Campanhas</strong> - Clique nos botões abaixo para detalhar.
             </p>
         </div>
         """, unsafe_allow_html=True)
@@ -900,12 +900,7 @@ with tab2:
                 # Ordenar para o gráfico
                 campanhas_top = campanhas_top.sort_values('Quantidade', ascending=True)
                 
-                # Criar lista de cores (destacar a selecionada)
-                cores = ['#003366'] * len(campanhas_top)
-                if st.session_state.campanha_selecionada in campanhas_top['Campanha'].values:
-                    idx = campanhas_top[campanhas_top['Campanha'] == st.session_state.campanha_selecionada].index[0]
-                    cores[campanhas_top.index.get_loc(idx)] = '#FF6600'  # Laranja para destacar
-                
+                # GRÁFICO DE BARRAS (apenas visual, sem clique)
                 fig_campanhas = px.bar(
                     campanhas_top,
                     x='Quantidade',
@@ -918,50 +913,65 @@ with tab2:
                     template=plotly_template
                 )
                 
-                # Personalizar cores das barras
+                # Destacar a campanha selecionada se houver
+                if st.session_state.campanha_selecionada and st.session_state.campanha_selecionada in campanhas_top['Campanha'].values:
+                    # Criar lista de cores
+                    cores = ['#003366'] * len(campanhas_top)
+                    idx = campanhas_top[campanhas_top['Campanha'] == st.session_state.campanha_selecionada].index[0]
+                    cores[campanhas_top.index.get_loc(idx)] = '#FF6600'  # Laranja para destacar
+                    
+                    fig_campanhas.update_traces(marker_color=cores)
+                
                 fig_campanhas.update_traces(
-                    marker_color=cores,
                     textposition='outside',
                     texttemplate='%{text}',
                     textfont=dict(size=12, color=text_color),
-                    hovertemplate='<b>%{y}</b><br>Demandas: %{x}<br><i>Clique para detalhar</i><extra></extra>'
+                    hovertemplate='<b>%{y}</b><br>Demandas: %{x}<extra></extra>'
                 )
                 
                 fig_campanhas.update_layout(
-                    height=400,
+                    height=350,
                     xaxis_title="Número de Demandas",
                     yaxis_title="",
                     showlegend=False,
                     font=dict(color=text_color),
                     paper_bgcolor='rgba(0,0,0,0)',
                     plot_bgcolor='rgba(0,0,0,0)',
-                    margin=dict(l=10, r=30, t=40, b=10),
-                    clickmode='event+select'  # Habilitar eventos de clique
+                    margin=dict(l=10, r=30, t=40, b=10)
                 )
                 
-                # Capturar evento de clique - CORRIGIDO!
-                evento_clique = st.plotly_chart(
-                    fig_campanhas, 
-                    use_container_width=True, 
-                    config={'displayModeBar': False},
-                    key="grafico_campanhas"
-                )
+                st.plotly_chart(fig_campanhas, use_container_width=True, config={'displayModeBar': False})
                 
-                # Processar clique se houver - CORRIGIDO!
-                if evento_clique and 'selection' in evento_clique:
-                    if evento_clique['selection'] and 'points' in evento_clique['selection']:
-                        points = evento_clique['selection']['points']
-                        if points and len(points) > 0:
-                            campanha_clicada = points[0]['y']
-                            if campanha_clicada != st.session_state.campanha_selecionada:
-                                st.session_state.campanha_selecionada = campanha_clicada
-                                st.rerun()
+                # BOTÕES PARA SELEÇÃO
+                st.markdown("##### 🔘 Selecione uma campanha:")
+                
+                # Criar botões em colunas (5 por linha)
+                for i in range(0, len(campanhas_top), 5):
+                    cols_botoes = st.columns(5)
+                    for j in range(5):
+                        if i + j < len(campanhas_top):
+                            idx = i + j
+                            campanha = campanhas_top.iloc[idx]['Campanha']
+                            qtd = campanhas_top.iloc[idx]['Quantidade']
+                            
+                            # Truncar nome se muito longo
+                            nome_curto = campanha[:15] + '...' if len(campanha) > 15 else campanha
+                            
+                            with cols_botoes[j]:
+                                if st.button(
+                                    f"{nome_curto} ({qtd})", 
+                                    key=f"btn_camp_{idx}",
+                                    use_container_width=True,
+                                    type="primary" if campanha == st.session_state.campanha_selecionada else "secondary"
+                                ):
+                                    st.session_state.campanha_selecionada = campanha
+                                    st.rerun()
                 
                 # Botão para limpar seleção
                 if st.session_state.campanha_selecionada:
-                    col_btn1, col_btn2 = st.columns([3, 1])
+                    col_btn1, col_btn2, col_btn3 = st.columns([1, 1, 1])
                     with col_btn2:
-                        if st.button("🧹 Limpar Seleção", key="limpar_selecao"):
+                        if st.button("🧹 Limpar Seleção", use_container_width=True, key="limpar_selecao"):
                             st.session_state.campanha_selecionada = None
                             st.rerun()
                 
@@ -970,7 +980,7 @@ with tab2:
                 top1_valor = campanhas_top.iloc[-1]['Quantidade']
                 
                 if st.session_state.campanha_selecionada:
-                    st.info(f"🔍 **Campanha selecionada:** {st.session_state.campanha_selecionada}")
+                    st.success(f"🔍 **Campanha selecionada:** {st.session_state.campanha_selecionada}")
                 else:
                     if len(top1_campanha) > 50:
                         st.caption(f"🥇 **Líder:** {top1_campanha[:50]}... ({top1_valor} demandas)")
@@ -999,19 +1009,19 @@ with tab2:
             else "Visão geral de todas as campanhas"
         ), unsafe_allow_html=True)
         
-        if 'Status' in df_kpi.columns:
+        if 'Status' in df_kpi.columns and coluna_campanha:
             # Filtrar por campanha selecionada se houver
-            if st.session_state.campanha_selecionada and coluna_campanha:
+            if st.session_state.campanha_selecionada:
                 df_filtrado = df_kpi[df_kpi[coluna_campanha] == st.session_state.campanha_selecionada]
                 titulo = f"Status - {st.session_state.campanha_selecionada[:30]}..."
             else:
                 df_filtrado = df_kpi
                 titulo = 'Distribuição Geral'
             
-            status_dist = df_filtrado['Status'].value_counts().reset_index()
-            status_dist.columns = ['Status', 'Quantidade']
-            
-            if not status_dist.empty:
+            if not df_filtrado.empty:
+                status_dist = df_filtrado['Status'].value_counts().reset_index()
+                status_dist.columns = ['Status', 'Quantidade']
+                
                 fig_status = px.pie(
                     status_dist,
                     values='Quantidade',
@@ -1056,8 +1066,9 @@ with tab2:
                         taxa = (concluidas / len(df_filtrado) * 100) if len(df_filtrado) > 0 else 0
                         st.metric("Taxa Conclusão", f"{taxa:.1f}%")
             else:
-                st.info(f"ℹ️ Sem dados de status para esta campanha")
+                st.info(f"ℹ️ Sem dados para esta campanha")
         else:
+            # Fallback para dados de exemplo
             status_data = {
                 'Status': ['Aprovado', 'Em Produção', 'Aguardando Aprovação', 'Concluído'],
                 'Quantidade': [124, 89, 67, 45]
