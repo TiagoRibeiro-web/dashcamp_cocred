@@ -596,18 +596,41 @@ with tab1:
             st.plotly_chart(fig_status, use_container_width=True, config={'displayModeBar': False})
     
     with col_status2:
-        
         if 'Status' in df.columns:
-            # Contagem exata por status
-            status_unicos = df['Status'].unique()
+            # Mapeamento exato dos status
+            status_map = {
+                'aguardando': ['Aguardando Aprovação', 'Aguardando'],
+                'producao': ['Em Produção', 'Produção'],
+                'aprovado': ['Aprovado'],
+                'concluido': ['Concluído', 'Finalizado']
+            }
             
-            aguardando = len(df[df['Status'] == 'Aguardando Aprovação'])
-            producao = len(df[df['Status'] == 'Em Produção'])
-            aprovado = len(df[df['Status'] == 'Aprovado'])
-            concluido = len(df[df['Status'] == 'Concluído'])
+            # Contagem com correspondência exata
+            aguardando = len(df[df['Status'].isin(status_map['aguardando'])])
+            producao = len(df[df['Status'].isin(status_map['producao'])])
+            aprovado = len(df[df['Status'].isin(status_map['aprovado'])])
+            concluido = len(df[df['Status'].isin(status_map['concluido'])])
             
-            # Se os nomes exatos forem diferentes, ajuste conforme sua base
-            # Exemplo: se for "Aguardando" em vez de "Aguardando Aprovação"
+            # Demais status (para referência)
+            outros = total_linhas - (aguardando + producao + aprovado + concluido)
+            
+            # Identificação mais precisa do gargalo
+            if producao > aguardando and producao > aprovado:
+                gargalo = '⚙️ Em Produção'
+                gargalo_valor = producao
+                gargalo_desc = "Mais demandas em produção do que aguardando ou aprovadas"
+            elif aguardando > producao and aguardando > aprovado:
+                gargalo = '⏳ Aguardando Aprovação'
+                gargalo_valor = aguardando
+                gargalo_desc = "Gargalo na aprovação - demandas paradas aguardando"
+            elif aprovado > producao and aprovado > aguardando:
+                gargalo = '✅ Aprovado'
+                gargalo_valor = aprovado
+                gargalo_desc = "Muitas demandas aprovadas aguardando produção"
+            else:
+                gargalo = '📊 Distribuído'
+                gargalo_valor = max(producao, aguardando, aprovado)
+                gargalo_desc = "Fluxo relativamente equilibrado"
             
             st.markdown(f"""
             <div class="resumo-card">
@@ -628,10 +651,18 @@ with tab1:
                     <span>🏁 Concluído:</span>
                     <span style="font-weight: bold;">{concluido}</span>
                 </div>
+                <div style="display: flex; justify-content: space-between; margin-bottom: 10px;">
+                    <span>📌 Outros:</span>
+                    <span style="font-weight: bold;">{outros}</span>
+                </div>
+                <div style="background: rgba(0, 51, 102, 0.1); padding: 15px; border-radius: 10px; margin-top: 15px;">
+                    <p style="margin: 0; color: #003366;">
+                        <strong>📌 Gargalo:</strong> {gargalo} ({gargalo_valor})<br>
+                        <small style="color: #6C757D;">{gargalo_desc}</small>
+                    </p>
+                </div>
             </div>
             """, unsafe_allow_html=True)
-    
-    st.divider()
     
     # ========== 3. ANÁLISE POR SOLICITANTE ==========
     if 'Solicitante' in df.columns:
