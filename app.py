@@ -515,21 +515,21 @@ with tab1:
         </div>
         """, unsafe_allow_html=True)
     
-    with col_metric3:
-        if 'Solicitante' in df.columns:
-            media_solicitante = total_linhas / df['Solicitante'].nunique() if df['Solicitante'].nunique() > 0 else 0
-        else:
-            media_solicitante = total_linhas / 9
-        st.markdown(f"""
-        <div class="metric-card-cocred" style="background: linear-gradient(135deg, #28A745 0%, #1E7E34 100%);">
-            <p style="font-size: 14px; margin: 0; opacity: 0.9;">👥 MÉDIA POR SOLICITANTE</p>
-            <p style="font-size: 36px; font-weight: bold; margin: 0;">{media_solicitante:.1f}</p>
-            <p style="font-size: 12px; margin: 0;">demandas por pessoa</p>
-            <p style="font-size: 11px; margin: 5px 0 0 0; opacity: 0.8;">
-                📌 Volume médio por usuário
-            </p>
-        </div>
-        """, unsafe_allow_html=True)
+    # with col_metric3:
+    #     if 'Solicitante' in df.columns:
+    #         media_solicitante = total_linhas / df['Solicitante'].nunique() if df['Solicitante'].nunique() > 0 else 0
+    #     else:
+    #         media_solicitante = total_linhas / 9
+    #     st.markdown(f"""
+    #     <div class="metric-card-cocred" style="background: linear-gradient(135deg, #28A745 0%, #1E7E34 100%);">
+    #         <p style="font-size: 14px; margin: 0; opacity: 0.9;">👥 MÉDIA POR SOLICITANTE</p>
+    #         <p style="font-size: 36px; font-weight: bold; margin: 0;">{media_solicitante:.1f}</p>
+    #         <p style="font-size: 12px; margin: 0;">demandas por pessoa</p>
+    #         <p style="font-size: 11px; margin: 5px 0 0 0; opacity: 0.8;">
+    #             📌 Volume médio por usuário
+    #         </p>
+    #     </div>
+    #     """, unsafe_allow_html=True)
     
     with col_metric4:
         perc_alta = (total_alta / total_linhas * 100) if total_linhas > 0 else 0
