@@ -1228,7 +1228,7 @@ with tab3:
             data_min = df['Data de Solicitação'].min().strftime('%d/%m/%Y')
             data_max = df['Data de Solicitação'].max().strftime('%d/%m/%Y')
             st.metric(
-                label="📅 Período", 
+                label="📅 Vigência", 
                 value=f"{data_min} a {data_max}",
                 help="Período coberto pelos dados"
             )
