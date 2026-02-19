@@ -872,13 +872,31 @@ with tab2:
             </p>
         </div>
         """, unsafe_allow_html=True)
+    
+    # PROcurar por coluna de campanha (várias possibilidades)
+    coluna_campanha = None
+    possiveis_nomes = ['Campanha', 'campanha', 'CAMPANHA', 'Nome da Campanha', 'Campanhas', 'campanhas']
+    
+    for col in df_kpi.columns:
+        if any(nome in col for nome in possiveis_nomes):
+            coluna_campanha = col
+            break
+    
+    if coluna_campanha:
+        # Debug (opcional - pode remover depois)
+        if st.session_state.get('debug_mode', False):
+            st.caption(f"🔍 Coluna encontrada: {coluna_campanha}")
         
-        if 'Campanha' in df_kpi.columns:
-            # Todas as campanhas ordenadas por volume
-            todas_campanhas = df_kpi['Campanha'].value_counts().reset_index()
-            todas_campanhas.columns = ['Campanha', 'Demandas']
-            total_campanhas = len(todas_campanhas)
-            
+        # Todas as campanhas ordenadas por volume
+        todas_campanhas = df_kpi[coluna_campanha].value_counts().reset_index()
+        todas_campanhas.columns = ['Campanha', 'Demandas']
+        total_campanhas = len(todas_campanhas)
+        
+        # Filtrar valores nulos ou vazios
+        todas_campanhas = todas_campanhas[todas_campanhas['Campanha'].notna()]
+        todas_campanhas = todas_campanhas[todas_campanhas['Campanha'] != '']
+        
+        if not todas_campanhas.empty:
             # Criar gráfico com todas as campanhas
             fig_completo = px.bar(
                 todas_campanhas.sort_values('Demandas', ascending=True),
@@ -934,7 +952,14 @@ with tab2:
                     value=total_demandas
                 )
         else:
-            st.info("ℹ️ Dados de campanha não disponíveis")
+            st.warning("⚠️ Coluna de campanha encontrada, mas sem dados válidos")
+    else:
+        # Se não encontrar coluna de campanha, mostrar as colunas disponíveis (modo debug)
+        st.warning("ℹ️ Dados de campanha não disponíveis")
+        
+        if st.session_state.get('debug_mode', False):
+            st.caption("📋 Colunas disponíveis no DataFrame:")
+            st.write(df_kpi.columns.tolist())
     
     with col_chart2:
         st.markdown("""
