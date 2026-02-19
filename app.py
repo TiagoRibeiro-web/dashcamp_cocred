@@ -596,20 +596,24 @@ with tab1:
             st.plotly_chart(fig_status, use_container_width=True, config={'displayModeBar': False})
     
     with col_status2:
+        
         if 'Status' in df.columns:
-            aguardando = len(df[df['Status'].str.contains('Aguardando', na=False, case=False)])
-            producao = len(df[df['Status'].str.contains('Produção', na=False, case=False)])
-            aprovado = len(df[df['Status'].str.contains('Aprovado', na=False, case=False)])
-            concluido = len(df[df['Status'].str.contains('Concluído', na=False, case=False)])
+            # Contagem exata por status
+            status_unicos = df['Status'].unique()
             
-            gargalo = 'Em Produção' if producao > aguardando else 'Aguardando'
-            gargalo_valor = producao if producao > aguardando else aguardando
+            aguardando = len(df[df['Status'] == 'Aguardando Aprovação'])
+            producao = len(df[df['Status'] == 'Em Produção'])
+            aprovado = len(df[df['Status'] == 'Aprovado'])
+            concluido = len(df[df['Status'] == 'Concluído'])
+            
+            # Se os nomes exatos forem diferentes, ajuste conforme sua base
+            # Exemplo: se for "Aguardando" em vez de "Aguardando Aprovação"
             
             st.markdown(f"""
             <div class="resumo-card">
                 <h4 style="color: #003366; margin-top: 0;">📋 Resumo do Fluxo</h4>
                 <div style="display: flex; justify-content: space-between; margin-bottom: 10px;">
-                    <span>⏳ Aguardando:</span>
+                    <span>⏳ Aguardando Aprovação:</span>
                     <span style="font-weight: bold;">{aguardando}</span>
                 </div>
                 <div style="display: flex; justify-content: space-between; margin-bottom: 10px;">
@@ -623,9 +627,6 @@ with tab1:
                 <div style="display: flex; justify-content: space-between; margin-bottom: 10px;">
                     <span>🏁 Concluído:</span>
                     <span style="font-weight: bold;">{concluido}</span>
-                </div>
-                <div style="background: rgba(0, 51, 102, 0.1); padding: 15px; border-radius: 10px; margin-top: 15px;">
-                    <p style="margin: 0; color: #003366;">📌 <strong>Gargalo:</strong> {gargalo} ({gargalo_valor})</p>
                 </div>
             </div>
             """, unsafe_allow_html=True)
