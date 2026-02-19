@@ -126,6 +126,28 @@ st.markdown("""
     a {
         color: #00A3E0 !important;
     }
+    
+    /* Estilo para o container de filtros */
+    .filtros-container {
+        background: linear-gradient(to right, rgba(0,51,102,0.05), rgba(0,163,224,0.05));
+        padding: 20px;
+        border-radius: 15px;
+        border: 1px solid rgba(0,51,102,0.2);
+        margin-bottom: 20px;
+    }
+    
+    /* Botão de aplicar filtros */
+    .stButton button {
+        background: linear-gradient(135deg, #003366, #00A3E0);
+        color: white;
+        border: none;
+        font-weight: bold;
+    }
+    
+    .stButton button:hover {
+        background: linear-gradient(135deg, #002244, #0077A3);
+        color: white;
+    }
 </style>
 """, unsafe_allow_html=True)
 
@@ -239,6 +261,14 @@ def extrair_tipo_demanda(df, texto):
                 pass
     return count
 
+def aplicar_filtros_data(df, coluna_data, data_inicio, data_fim):
+    """Aplica filtro de data em uma coluna específica"""
+    if coluna_data in df.columns and data_inicio and data_fim:
+        data_inicio_ts = pd.Timestamp(data_inicio)
+        data_fim_ts = pd.Timestamp(data_fim) + pd.Timedelta(days=1) - pd.Timedelta(seconds=1)
+        return df[(df[coluna_data] >= data_inicio_ts) & (df[coluna_data] <= data_fim_ts)]
+    return df
+
 # =========================================================
 # CARREGAR DADOS
 # =========================================================
@@ -275,7 +305,7 @@ for col in ['Data de Solicitação', 'Deadline', 'Data de Entrega']:
             df[col] = df[col].dt.tz_localize(None)
 
 # =========================================================
-# CALCULAR MÉTRICAS
+# CALCULAR MÉTRICAS GLOBAIS
 # =========================================================
 total_linhas = len(df)
 total_colunas = len(df.columns)
@@ -352,7 +382,8 @@ with st.sidebar:
     linhas_por_pagina = st.selectbox(
         "📋 Linhas por página:",
         ["50", "100", "200", "500", "Todas"],
-        index=1
+        index=1,
+        key="sidebar_linhas_por_pagina"
     )
     
     modo_compacto = st.checkbox("📏 Modo compacto", value=False)
@@ -415,7 +446,7 @@ with st.sidebar:
         <p style="margin: 0;">Desenvolvido para</p>
         <p style="margin: 0; font-weight: bold; color: #003366;">SICOOB COCRED</p>
         <p style="margin: 5px 0 0 0;">© 2026 - Ideatore</p>
-        <p style="margin: 5px 0 0 0;">v4.2.0</p>
+        <p style="margin: 5px 0 0 0;">v4.3.0</p>
     </div>
     """, unsafe_allow_html=True)
 
@@ -442,7 +473,7 @@ st.info(f"📋 **Colunas:** {', '.join(df.columns.tolist()[:5])}{'...' if len(df
 tab1, tab2, tab3 = st.tabs([
     "📈 Análise Estratégica",
     "🎯 KPIs COCRED",
-    "📊 Dados Completos"
+    "📋 Explorador de Dados"
 ])
 
 # =========================================================
@@ -871,7 +902,7 @@ with tab2:
                 df_kpi = df_kpi[pd.to_datetime(df_kpi['Data de Solicitação']).dt.date >= data_limite]
     
     total_kpi = len(df_kpi)
-    #st.divider()
+    st.divider()
     
     # ========== CARDS DE KPIs (COMENTADOS NO ORIGINAL) ==========
     # st.markdown("### 🎯 Indicadores Estratégicos")
@@ -956,7 +987,7 @@ with tab2:
     #     </div>
     #     """, unsafe_allow_html=True)
     
-    #st.divider()
+    st.divider()
     
     # ========== GRÁFICOS ==========
     col_chart1, col_chart2 = st.columns([3, 2])
@@ -1115,97 +1146,130 @@ with tab2:
         st.dataframe(demandas_exemplo, use_container_width=True, height=350, hide_index=True)
 
 # =========================================================
-# TAB 3: DADOS COMPLETOS (COM FILTROS AVANÇADOS)
+# TAB 3: EXPLORADOR DE DADOS (NOVA VERSÃO OTIMIZADA!)
 # =========================================================
 with tab3:
-    st.markdown("## 📊 Dados Completos")
+    st.markdown("## 📋 Explorador de Dados")
     
     # =========================================================
-    # FILTROS AVANÇADOS (AGORA DENTRO DA TAB3!)
+    # HEADER COM ESTATÍSTICAS RÁPIDAS
     # =========================================================
-    st.markdown("### 🎛️ Filtros Avançados")
+    col_stats1, col_stats2, col_stats3, col_stats4 = st.columns(4)
     
-    # Layout com 5 colunas para acomodar os 2 filtros de data
-    filtro_cols = st.columns(5)
-    filtros_ativos = {}
+    with col_stats1:
+        st.metric(
+            label="📊 Total de Registros", 
+            value=f"{total_linhas:,}",
+            help="Todos os registros disponíveis na base"
+        )
     
-    # Coluna 1: Status
-    if 'Status' in df.columns:
-        with filtro_cols[0]:
-            status_opcoes = ['Todos'] + sorted(df['Status'].dropna().unique().tolist())
-            status_selecionado = st.selectbox("📌 Status:", status_opcoes, key="filtro_status")
-            if status_selecionado != 'Todos':
-                filtros_ativos['Status'] = status_selecionado
-    
-    # Coluna 2: Prioridade
-    if 'Prioridade' in df.columns:
-        with filtro_cols[1]:
-            prioridade_opcoes = ['Todos'] + sorted(df['Prioridade'].dropna().unique().tolist())
-            prioridade_selecionada = st.selectbox("⚡ Prioridade:", prioridade_opcoes, key="filtro_prioridade")
-            if prioridade_selecionada != 'Todos':
-                filtros_ativos['Prioridade'] = prioridade_selecionada
-    
-    # Coluna 3: Produção
-    if 'Produção' in df.columns:
-        with filtro_cols[2]:
-            producao_opcoes = ['Todos'] + sorted(df['Produção'].dropna().unique().tolist())
-            producao_selecionada = st.selectbox("🏭 Produção:", producao_opcoes, key="filtro_producao")
-            if producao_selecionada != 'Todos':
-                filtros_ativos['Produção'] = producao_selecionada
-    
-    # ========== COLUNA 4: FILTRO DE DATA DE SOLICITAÇÃO (COM QUINZENA) ==========
-    with filtro_cols[3]:
-        st.markdown("**📅 Data Solicitação**")
-        
+    with col_stats2:
         if 'Data de Solicitação' in df.columns:
-            datas_validas = df['Data de Solicitação'].dropna()
-            if not datas_validas.empty:
-                data_min = datas_validas.min().date()
-                data_max = datas_validas.max().date()
-                
-                periodo_opcao = st.selectbox(
-                    "Período:", 
-                    ["Todos", "Hoje", "Esta semana", "Este mês", "Quinzena", "Últimos 30 dias", "Personalizado"], 
-                    key="periodo_data"
+            data_min = df['Data de Solicitação'].min().strftime('%d/%m/%Y')
+            data_max = df['Data de Solicitação'].max().strftime('%d/%m/%Y')
+            st.metric(
+                label="📅 Período", 
+                value=f"{data_min} a {data_max}",
+                help="Período coberto pelos dados"
+            )
+        else:
+            st.metric(label="📅 Período", value="N/A")
+    
+    with col_stats3:
+        if 'Status' in df.columns:
+            status_unicos = df['Status'].nunique()
+            st.metric(
+                label="🏷️ Status", 
+                value=status_unicos,
+                help="Quantidade de status diferentes"
+            )
+        else:
+            st.metric(label="🏷️ Status", value="N/A")
+    
+    with col_stats4:
+        st.metric(
+            label="🔄 Atualização", 
+            value=datetime.now().strftime('%d/%m/%Y'),
+            help="Data da última atualização"
+        )
+    
+    st.divider()
+    
+    # =========================================================
+    # FILTROS AVANÇADOS (COMPACTOS EM 2 LINHAS)
+    # =========================================================
+    with st.container():
+        st.markdown("##### 🔍 Filtros Avançados")
+        
+        # Primeira linha de filtros (categóricos)
+        col_f1, col_f2, col_f3 = st.columns(3)
+        
+        filtros_ativos = {}
+        
+        with col_f1:
+            if 'Status' in df.columns:
+                status_opcoes = ['Todos'] + sorted(df['Status'].dropna().unique().tolist())
+                status_selecionado = st.selectbox("📌 Status", status_opcoes, key="tab3_status")
+                if status_selecionado != 'Todos':
+                    filtros_ativos['Status'] = status_selecionado
+        
+        with col_f2:
+            if 'Prioridade' in df.columns:
+                prioridade_opcoes = ['Todos'] + sorted(df['Prioridade'].dropna().unique().tolist())
+                prioridade_selecionada = st.selectbox("⚡ Prioridade", prioridade_opcoes, key="tab3_prioridade")
+                if prioridade_selecionada != 'Todos':
+                    filtros_ativos['Prioridade'] = prioridade_selecionada
+        
+        with col_f3:
+            if 'Produção' in df.columns:
+                producao_opcoes = ['Todos'] + sorted(df['Produção'].dropna().unique().tolist())
+                producao_selecionada = st.selectbox("🏭 Produção", producao_opcoes, key="tab3_producao")
+                if producao_selecionada != 'Todos':
+                    filtros_ativos['Produção'] = producao_selecionada
+        
+        # Segunda linha de filtros (datas)
+        col_f4, col_f5, col_f6 = st.columns([2, 2, 1])
+        
+        with col_f4:
+            if 'Data de Solicitação' in df.columns:
+                periodo_data = st.selectbox(
+                    "📅 Data de Solicitação", 
+                    ["Todos", "Hoje", "Esta semana", "Este mês", "Quinzena", "Últimos 30 dias", "Personalizado"],
+                    key="tab3_periodo_data"
                 )
+                
                 hoje = datetime.now().date()
                 
-                if periodo_opcao == "Todos":
-                    filtros_ativos['data_inicio'] = data_min
-                    filtros_ativos['data_fim'] = data_max
-                    filtros_ativos['tem_filtro_data'] = True
-                elif periodo_opcao == "Hoje":
+                if periodo_data == "Hoje":
                     filtros_ativos['data_inicio'] = hoje
                     filtros_ativos['data_fim'] = hoje
                     filtros_ativos['tem_filtro_data'] = True
-                elif periodo_opcao == "Esta semana":
+                elif periodo_data == "Esta semana":
                     inicio_semana = hoje - timedelta(days=hoje.weekday())
                     filtros_ativos['data_inicio'] = inicio_semana
                     filtros_ativos['data_fim'] = hoje
                     filtros_ativos['tem_filtro_data'] = True
-                elif periodo_opcao == "Este mês":
+                elif periodo_data == "Este mês":
                     inicio_mes = hoje.replace(day=1)
                     filtros_ativos['data_inicio'] = inicio_mes
                     filtros_ativos['data_fim'] = hoje
                     filtros_ativos['tem_filtro_data'] = True
-                elif periodo_opcao == "Quinzena":
-                    # Opções para escolher a quinzena
+                elif periodo_data == "Quinzena":
                     quinzena_opcao = st.radio(
-                        "Escolha a quinzena:",
-                        ["Primeira quinzena (dias 1-15)", "Segunda quinzena (dias 16-31)"],
+                        "Escolha:",
+                        ["1ª quinzena (1-15)", "2ª quinzena (16-31)"],
                         horizontal=True,
-                        key="quinzena_opcao"
+                        key="quinzena_opcao",
+                        label_visibility="collapsed"
                     )
                     
                     ano_atual = hoje.year
                     mes_atual = hoje.month
                     
-                    if quinzena_opcao == "Primeira quinzena (dias 1-15)":
-                        # Primeira quinzena: dias 1 a 15 do mês atual
+                    if quinzena_opcao == "1ª quinzena (1-15)":
                         data_inicio_quinzena = date(ano_atual, mes_atual, 1)
                         data_fim_quinzena = date(ano_atual, mes_atual, 15)
                     else:
-                        # Segunda quinzena: dia 16 até último dia do mês
                         ultimo_dia = (date(ano_atual, mes_atual, 1) + timedelta(days=32)).replace(day=1) - timedelta(days=1)
                         data_inicio_quinzena = date(ano_atual, mes_atual, 16)
                         data_fim_quinzena = ultimo_dia
@@ -1214,278 +1278,274 @@ with tab3:
                     filtros_ativos['data_fim'] = data_fim_quinzena
                     filtros_ativos['tem_filtro_data'] = True
                     
-                    # Mostrar informação da quinzena selecionada
                     st.caption(f"📅 {data_inicio_quinzena.strftime('%d/%m')} a {data_fim_quinzena.strftime('%d/%m')}")
                     
-                elif periodo_opcao == "Últimos 30 dias":
+                elif periodo_data == "Últimos 30 dias":
                     inicio_30d = hoje - timedelta(days=30)
                     filtros_ativos['data_inicio'] = inicio_30d
                     filtros_ativos['data_fim'] = hoje
                     filtros_ativos['tem_filtro_data'] = True
-                elif periodo_opcao == "Personalizado":
-                    col1, col2 = st.columns(2)
-                    with col1:
-                        data_ini = st.date_input("De", data_min, key="data_ini")
-                    with col2:
-                        data_fim = st.date_input("Até", data_max, key="data_fim")
-                    filtros_ativos['data_inicio'] = data_ini
-                    filtros_ativos['data_fim'] = data_fim
-                    filtros_ativos['tem_filtro_data'] = True
-        else:
-            st.info("ℹ️ Indisponível")
-    
-    # ========== COLUNA 5: FILTRO DE DEADLINE ==========
-    with filtro_cols[4]:
-        st.markdown("**⏰ Deadline**")
+                elif periodo_data == "Personalizado":
+                    datas_validas = df['Data de Solicitação'].dropna()
+                    if not datas_validas.empty:
+                        data_min = datas_validas.min().date()
+                        data_max = datas_validas.max().date()
+                        
+                        col_d1, col_d2 = st.columns(2)
+                        with col_d1:
+                            data_ini = st.date_input("De", data_min, key="tab3_data_ini")
+                        with col_d2:
+                            data_fim = st.date_input("Até", data_max, key="tab3_data_fim")
+                        
+                        filtros_ativos['data_inicio'] = data_ini
+                        filtros_ativos['data_fim'] = data_fim
+                        filtros_ativos['tem_filtro_data'] = True
         
-        # Procurar por colunas de deadline/prazo
-        coluna_deadline = None
-        for col in df.columns:
-            if 'deadline' in col.lower() or 'prazo' in col.lower() or 'data entrega' in col.lower():
-                coluna_deadline = col
-                break
-        
-        if coluna_deadline is None and 'Deadline' in df.columns:
-            coluna_deadline = 'Deadline'
-        elif coluna_deadline is None and 'Prazo' in df.columns:
-            coluna_deadline = 'Prazo'
-        elif coluna_deadline is None and 'Data de Entrega' in df.columns:
-            coluna_deadline = 'Data de Entrega'
-        
-        if coluna_deadline:
-            # Garantir que é datetime
-            if not pd.api.types.is_datetime64_any_dtype(df[coluna_deadline]):
-                df[coluna_deadline] = pd.to_datetime(df[coluna_deadline], errors='coerce')
+        with col_f5:
+            # Procurar por colunas de deadline
+            coluna_deadline = None
+            for col in df.columns:
+                if 'deadline' in col.lower() or 'prazo' in col.lower() or 'data entrega' in col.lower():
+                    coluna_deadline = col
+                    break
             
-            datas_validas_deadline = df[coluna_deadline].dropna()
+            if coluna_deadline is None and 'Deadline' in df.columns:
+                coluna_deadline = 'Deadline'
             
-            if not datas_validas_deadline.empty:
-                data_min_deadline = datas_validas_deadline.min().date()
-                data_max_deadline = datas_validas_deadline.max().date()
-                
-                periodo_opcao_deadline = st.selectbox(
-                    "Período:", 
-                    ["Todos", "Hoje", "Esta semana", "Este mês", "Próximos 7 dias", "Próximos 30 dias", "Atrasados", "Personalizado"], 
-                    key="periodo_deadline"
+            if coluna_deadline:
+                periodo_deadline = st.selectbox(
+                    "⏰ Deadline", 
+                    ["Todos", "Hoje", "Esta semana", "Este mês", "Próximos 7 dias", "Próximos 30 dias", "Atrasados", "Personalizado"],
+                    key="tab3_periodo_deadline"
                 )
                 
                 hoje = datetime.now().date()
                 
-                if periodo_opcao_deadline == "Todos":
-                    filtros_ativos['deadline_inicio'] = data_min_deadline
-                    filtros_ativos['deadline_fim'] = data_max_deadline
-                    filtros_ativos['tem_filtro_deadline'] = True
-                    filtros_ativos['coluna_deadline'] = coluna_deadline
-                    
-                elif periodo_opcao_deadline == "Hoje":
-                    filtros_ativos['deadline_inicio'] = hoje
-                    filtros_ativos['deadline_fim'] = hoje
-                    filtros_ativos['tem_filtro_deadline'] = True
-                    filtros_ativos['coluna_deadline'] = coluna_deadline
-                    
-                elif periodo_opcao_deadline == "Esta semana":
-                    inicio_semana = hoje - timedelta(days=hoje.weekday())
-                    fim_semana = inicio_semana + timedelta(days=6)
-                    filtros_ativos['deadline_inicio'] = inicio_semana
-                    filtros_ativos['deadline_fim'] = fim_semana
-                    filtros_ativos['tem_filtro_deadline'] = True
-                    filtros_ativos['coluna_deadline'] = coluna_deadline
-                    
-                elif periodo_opcao_deadline == "Este mês":
-                    inicio_mes = hoje.replace(day=1)
-                    ultimo_dia = (inicio_mes + timedelta(days=32)).replace(day=1) - timedelta(days=1)
-                    filtros_ativos['deadline_inicio'] = inicio_mes
-                    filtros_ativos['deadline_fim'] = ultimo_dia
-                    filtros_ativos['tem_filtro_deadline'] = True
-                    filtros_ativos['coluna_deadline'] = coluna_deadline
-                    
-                elif periodo_opcao_deadline == "Próximos 7 dias":
-                    filtros_ativos['deadline_inicio'] = hoje
-                    filtros_ativos['deadline_fim'] = hoje + timedelta(days=7)
-                    filtros_ativos['tem_filtro_deadline'] = True
-                    filtros_ativos['coluna_deadline'] = coluna_deadline
-                    
-                elif periodo_opcao_deadline == "Próximos 30 dias":
-                    filtros_ativos['deadline_inicio'] = hoje
-                    filtros_ativos['deadline_fim'] = hoje + timedelta(days=30)
-                    filtros_ativos['tem_filtro_deadline'] = True
-                    filtros_ativos['coluna_deadline'] = coluna_deadline
-                    
-                elif periodo_opcao_deadline == "Atrasados":
-                    filtros_ativos['deadline_inicio'] = data_min_deadline
-                    filtros_ativos['deadline_fim'] = hoje - timedelta(days=1)
-                    filtros_ativos['tem_filtro_deadline'] = True
-                    filtros_ativos['coluna_deadline'] = coluna_deadline
-                    
-                elif periodo_opcao_deadline == "Personalizado":
-                    col1, col2 = st.columns(2)
-                    with col1:
-                        data_ini_deadline = st.date_input("De", data_min_deadline, key="deadline_ini")
-                    with col2:
-                        data_fim_deadline = st.date_input("Até", data_max_deadline, key="deadline_fim")
-                    filtros_ativos['deadline_inicio'] = data_ini_deadline
-                    filtros_ativos['deadline_fim'] = data_fim_deadline
-                    filtros_ativos['tem_filtro_deadline'] = True
-                    filtros_ativos['coluna_deadline'] = coluna_deadline
+                if periodo_deadline != "Todos":
+                    datas_validas_deadline = df[coluna_deadline].dropna()
+                    if not datas_validas_deadline.empty:
+                        data_min_deadline = datas_validas_deadline.min().date()
+                        data_max_deadline = datas_validas_deadline.max().date()
+                        
+                        if periodo_deadline == "Hoje":
+                            filtros_ativos['deadline_inicio'] = hoje
+                            filtros_ativos['deadline_fim'] = hoje
+                            filtros_ativos['tem_filtro_deadline'] = True
+                            filtros_ativos['coluna_deadline'] = coluna_deadline
+                        elif periodo_deadline == "Esta semana":
+                            inicio_semana = hoje - timedelta(days=hoje.weekday())
+                            fim_semana = inicio_semana + timedelta(days=6)
+                            filtros_ativos['deadline_inicio'] = inicio_semana
+                            filtros_ativos['deadline_fim'] = fim_semana
+                            filtros_ativos['tem_filtro_deadline'] = True
+                            filtros_ativos['coluna_deadline'] = coluna_deadline
+                        elif periodo_deadline == "Este mês":
+                            inicio_mes = hoje.replace(day=1)
+                            ultimo_dia = (inicio_mes + timedelta(days=32)).replace(day=1) - timedelta(days=1)
+                            filtros_ativos['deadline_inicio'] = inicio_mes
+                            filtros_ativos['deadline_fim'] = ultimo_dia
+                            filtros_ativos['tem_filtro_deadline'] = True
+                            filtros_ativos['coluna_deadline'] = coluna_deadline
+                        elif periodo_deadline == "Próximos 7 dias":
+                            filtros_ativos['deadline_inicio'] = hoje
+                            filtros_ativos['deadline_fim'] = hoje + timedelta(days=7)
+                            filtros_ativos['tem_filtro_deadline'] = True
+                            filtros_ativos['coluna_deadline'] = coluna_deadline
+                        elif periodo_deadline == "Próximos 30 dias":
+                            filtros_ativos['deadline_inicio'] = hoje
+                            filtros_ativos['deadline_fim'] = hoje + timedelta(days=30)
+                            filtros_ativos['tem_filtro_deadline'] = True
+                            filtros_ativos['coluna_deadline'] = coluna_deadline
+                        elif periodo_deadline == "Atrasados":
+                            filtros_ativos['deadline_inicio'] = data_min_deadline
+                            filtros_ativos['deadline_fim'] = hoje - timedelta(days=1)
+                            filtros_ativos['tem_filtro_deadline'] = True
+                            filtros_ativos['coluna_deadline'] = coluna_deadline
+                        elif periodo_deadline == "Personalizado":
+                            col_dd1, col_dd2 = st.columns(2)
+                            with col_dd1:
+                                data_ini_deadline = st.date_input("De", data_min_deadline, key="tab3_deadline_ini")
+                            with col_dd2:
+                                data_fim_deadline = st.date_input("Até", data_max_deadline, key="tab3_deadline_fim")
+                            filtros_ativos['deadline_inicio'] = data_ini_deadline
+                            filtros_ativos['deadline_fim'] = data_fim_deadline
+                            filtros_ativos['tem_filtro_deadline'] = True
+                            filtros_ativos['coluna_deadline'] = coluna_deadline
             else:
-                st.info("ℹ️ Sem datas")
-        else:
-            st.info("ℹ️ Sem coluna")
+                st.selectbox("⏰ Deadline", ["Indisponível"], disabled=True, key="tab3_deadline_disabled")
+        
+        with col_f6:
+            st.markdown("<br>", unsafe_allow_html=True)  # Espaço para alinhar com os selects acima
+            aplicar_filtros = st.button("🔍 Aplicar Filtros", type="primary", use_container_width=True, key="tab3_aplicar_filtros")
     
     st.divider()
     
     # =========================================================
-    # APLICAR FILTROS
+    # ÁREA DE PESQUISA E EXPORTAÇÃO
     # =========================================================
-    df_filtrado = df.copy()
+    col_search, col_export, col_clear = st.columns([3, 1, 1])
+    
+    with col_search:
+        termo_pesquisa = st.text_input(
+            "🔎 Pesquisar em todas as colunas:", 
+            placeholder="Digite para buscar...",
+            key="tab3_pesquisa"
+        )
+    
+    with col_export:
+        st.markdown("<br>", unsafe_allow_html=True)
+        # Preparar dados para exportação
+        df_export = df.copy()
+        if filtros_ativos:
+            df_export = aplicar_filtros_completos(df, filtros_ativos)
+        if termo_pesquisa:
+            mask = df_export.apply(lambda row: row.astype(str).str.contains(termo_pesquisa, case=False).any(), axis=1)
+            df_export = df_export[mask]
+        
+        csv = df_export.to_csv(index=False, encoding='utf-8-sig')
+        st.download_button(
+            label="📥 CSV",
+            data=csv,
+            file_name=f"dados_cocred_{datetime.now().strftime('%Y%m%d_%H%M')}.csv",
+            mime="text/csv",
+            use_container_width=True
+        )
+    
+    with col_clear:
+        st.markdown("<br>", unsafe_allow_html=True)
+        if filtros_ativos or termo_pesquisa:
+            if st.button("🧹 Limpar Tudo", use_container_width=True, key="tab3_limpar"):
+                for key in list(st.session_state.keys()):
+                    if key.startswith('tab3_'):
+                        del st.session_state[key]
+                st.rerun()
+    
+    # =========================================================
+    # APLICAR FILTROS E PESQUISA
+    # =========================================================
+    df_final = df.copy()
     
     # Aplicar filtros categóricos
     for col, valor in filtros_ativos.items():
         if col not in ['data_inicio', 'data_fim', 'tem_filtro_data', 
                        'deadline_inicio', 'deadline_fim', 'tem_filtro_deadline', 'coluna_deadline']:
-            df_filtrado = df_filtrado[df_filtrado[col] == valor]
+            df_final = df_final[df_final[col] == valor]
     
     # Aplicar filtro de data de solicitação
     if 'tem_filtro_data' in filtros_ativos and 'Data de Solicitação' in df.columns:
         data_inicio = pd.Timestamp(filtros_ativos['data_inicio'])
         data_fim = pd.Timestamp(filtros_ativos['data_fim']) + pd.Timedelta(days=1) - pd.Timedelta(seconds=1)
-        df_filtrado = df_filtrado[
-            (df_filtrado['Data de Solicitação'] >= data_inicio) & 
-            (df_filtrado['Data de Solicitação'] <= data_fim)
+        df_final = df_final[
+            (df_final['Data de Solicitação'] >= data_inicio) & 
+            (df_final['Data de Solicitação'] <= data_fim)
         ]
     
     # Aplicar filtro de deadline
     if 'tem_filtro_deadline' in filtros_ativos and 'coluna_deadline' in filtros_ativos:
         col_deadline = filtros_ativos['coluna_deadline']
-        if col_deadline in df_filtrado.columns:
+        if col_deadline in df_final.columns:
             deadline_inicio = pd.Timestamp(filtros_ativos['deadline_inicio'])
             deadline_fim = pd.Timestamp(filtros_ativos['deadline_fim']) + pd.Timedelta(days=1) - pd.Timedelta(seconds=1)
-            df_filtrado = df_filtrado[
-                (df_filtrado[col_deadline] >= deadline_inicio) & 
-                (df_filtrado[col_deadline] <= deadline_fim)
+            df_final = df_final[
+                (df_final[col_deadline] >= deadline_inicio) & 
+                (df_final[col_deadline] <= deadline_fim)
             ]
     
-    # =========================================================
-    # MOSTRAR RESULTADOS DOS FILTROS
-    # =========================================================
-    if filtros_ativos:
-        st.subheader(f"📊 Dados Filtrados ({len(df_filtrado)} de {total_linhas} registros)")
-        
-        if len(df_filtrado) > 0:
-            altura_filtrada = calcular_altura_tabela(len(df_filtrado), len(df_filtrado.columns))
-            st.dataframe(df_filtrado, use_container_width=True, height=min(altura_filtrada, 800))
-            
-            col_filtros_resumo1, col_filtros_resumo2, col_filtros_resumo3 = st.columns(3)
-            
-            with col_filtros_resumo1:
-                st.metric("📈 Registros Filtrados", len(df_filtrado))
-            
-            with col_filtros_resumo2:
-                porcentagem = (len(df_filtrado) / total_linhas * 100) if total_linhas > 0 else 0
-                st.metric("📊 % do Total", f"{porcentagem:.1f}%")
-            
-            with col_filtros_resumo3:
-                if 'tem_filtro_data' in filtros_ativos:
-                    st.metric("📅 Solicitação", 
-                             f"{filtros_ativos['data_inicio'].strftime('%d/%m')} a {filtros_ativos['data_fim'].strftime('%d/%m')}")
-                elif 'tem_filtro_deadline' in filtros_ativos:
-                    st.metric("⏰ Deadline", 
-                             f"{filtros_ativos['deadline_inicio'].strftime('%d/%m')} a {filtros_ativos['deadline_fim'].strftime('%d/%m')}")
-            
-            if st.button("🧹 Limpar Todos os Filtros", type="secondary", use_container_width=True):
-                for key in list(st.session_state.keys()):
-                    if key.startswith('filtro_') or key in ['periodo_data', 'data_ini', 'data_fim', 
-                                                            'periodo_deadline', 'deadline_ini', 'deadline_fim']:
-                        del st.session_state[key]
-                st.rerun()
-        else:
-            st.warning("⚠️ Nenhum registro corresponde aos filtros aplicados.")
-    else:
-        st.info("👆 Use os filtros acima para refinar os dados")
+    # Aplicar pesquisa
+    if termo_pesquisa:
+        mask = pd.Series(False, index=df_final.index)
+        for col in df_final.columns:
+            if df_final[col].dtype == 'object':
+                try:
+                    mask = mask | df_final[col].astype(str).str.contains(termo_pesquisa, case=False, na=False)
+                except:
+                    pass
+        df_final = df_final[mask]
     
     # =========================================================
-    # TABELA COMPLETA (COM PAGINAÇÃO)
+    # RESULTADOS E TABELA PRINCIPAL
     # =========================================================
-    if linhas_por_pagina == "Todas":
-        altura_tabela = calcular_altura_tabela(len(df_filtrado), total_colunas)
-        st.subheader(f"📋 Todos os {len(df_filtrado)} registros")
-        st.dataframe(df_filtrado, height=altura_tabela, use_container_width=True, hide_index=False)
+    st.subheader(f"📊 Resultados: {len(df_final)} registros encontrados")
+    
+    if filtros_ativos or termo_pesquisa:
+        st.info(f"🔍 **Filtros ativos:** {len(df_final)} de {total_linhas} registros ({len(df_final)/total_linhas*100:.1f}%)")
+    
+    # Tabela principal com paginação
+    if len(df_final) > 0:
+        # Usar a configuração de linhas por página da sidebar
+        linhas_por_pagina_atual = linhas_por_pagina
+        
+        if linhas_por_pagina_atual == "Todas":
+            altura_tabela = calcular_altura_tabela(len(df_final), len(df_final.columns))
+            st.dataframe(df_final, height=min(altura_tabela, 700), use_container_width=True, hide_index=True)
+        else:
+            linhas_por_pagina_int = int(linhas_por_pagina_atual)
+            total_paginas = (len(df_final) - 1) // linhas_por_pagina_int + 1 if len(df_final) > 0 else 1
+            
+            # Estado da página atual
+            if 'tab3_pagina_atual' not in st.session_state:
+                st.session_state.tab3_pagina_atual = 1
+            
+            # Navegação
+            col_nav1, col_nav2, col_nav3, col_nav4 = st.columns([2, 1, 1, 2])
+            
+            with col_nav1:
+                st.write(f"**Página {st.session_state.tab3_pagina_atual} de {total_paginas}**")
+            
+            with col_nav2:
+                if st.session_state.tab3_pagina_atual > 1:
+                    if st.button("⬅️ Anterior", key="tab3_anterior", use_container_width=True):
+                        st.session_state.tab3_pagina_atual -= 1
+                        st.rerun()
+            
+            with col_nav3:
+                if st.session_state.tab3_pagina_atual < total_paginas:
+                    if st.button("Próxima ➡️", key="tab3_proxima", use_container_width=True):
+                        st.session_state.tab3_pagina_atual += 1
+                        st.rerun()
+            
+            with col_nav4:
+                nova_pagina = st.number_input(
+                    "Ir para:", 
+                    min_value=1, 
+                    max_value=total_paginas, 
+                    value=st.session_state.tab3_pagina_atual,
+                    key="tab3_pagina_input"
+                )
+                if nova_pagina != st.session_state.tab3_pagina_atual:
+                    st.session_state.tab3_pagina_atual = nova_pagina
+                    st.rerun()
+            
+            # Mostrar dados da página atual
+            inicio = (st.session_state.tab3_pagina_atual - 1) * linhas_por_pagina_int
+            fim = min(inicio + linhas_por_pagina_int, len(df_final))
+            
+            st.caption(f"Mostrando linhas {inicio + 1} a {fim} de {len(df_final)}")
+            altura_pagina = calcular_altura_tabela(linhas_por_pagina_int, len(df_final.columns))
+            st.dataframe(
+                df_final.iloc[inicio:fim], 
+                height=min(altura_pagina, 600), 
+                use_container_width=True, 
+                hide_index=True
+            )
     else:
-        linhas_por_pagina = int(linhas_por_pagina)
-        total_paginas = (len(df_filtrado) - 1) // linhas_por_pagina + 1 if len(df_filtrado) > 0 else 1
-        
-        if 'pagina_atual' not in st.session_state:
-            st.session_state.pagina_atual = 1
-        
-        col_nav1, col_nav2, col_nav3, col_nav4 = st.columns([2, 1, 1, 2])
-        
-        with col_nav1:
-            st.write(f"**Página {st.session_state.pagina_atual} de {total_paginas}**")
-        
-        with col_nav2:
-            if st.session_state.pagina_atual > 1:
-                if st.button("⬅️ Anterior", use_container_width=True):
-                    st.session_state.pagina_atual -= 1
-                    st.rerun()
-        
-        with col_nav3:
-            if st.session_state.pagina_atual < total_paginas:
-                if st.button("Próxima ➡️", use_container_width=True):
-                    st.session_state.pagina_atual += 1
-                    st.rerun()
-        
-        with col_nav4:
-            nova_pagina = st.number_input("Ir para página:", min_value=1, max_value=total_paginas, 
-                                         value=st.session_state.pagina_atual, key="pagina_input")
-            if nova_pagina != st.session_state.pagina_atual:
-                st.session_state.pagina_atual = nova_pagina
-                st.rerun()
-        
-        inicio = (st.session_state.pagina_atual - 1) * linhas_por_pagina
-        fim = min(inicio + linhas_por_pagina, len(df_filtrado))
-        
-        st.write(f"**Mostrando linhas {inicio + 1} a {fim} de {len(df_filtrado)}**")
-        altura_pagina = calcular_altura_tabela(linhas_por_pagina, total_colunas)
-        st.dataframe(df_filtrado.iloc[inicio:fim], height=altura_pagina, use_container_width=True, hide_index=False)
+        st.warning("⚠️ Nenhum registro encontrado com os filtros e pesquisa atuais.")
 
 # =========================================================
-# SEÇÃO DE PESQUISA (COMENTADA NO ORIGINAL)
+# SEÇÃO DE PESQUISA (COMENTADA NO ORIGINAL - MANTIDA PARA REFERÊNCIA)
 # =========================================================
 # with tab3:
 #     st.subheader("🔍 Pesquisa nos Dados")
-    
-#     texto_pesquisa = st.text_input(
-#         "🔎 Pesquisar em todas as colunas:", 
-#         placeholder="Digite um termo para buscar...",
-#         key="pesquisa_principal"
-#     )
-    
-#     if texto_pesquisa:
-#         mask = pd.Series(False, index=df.index)
-#         for col in df.columns:
-#             if df[col].dtype == 'object':
-#                 try:
-#                     mask = mask | df[col].astype(str).str.contains(texto_pesquisa, case=False, na=False)
-#                 except:
-#                     pass
-        
-#         resultados = df[mask]
-        
-#         if len(resultados) > 0:
-#             st.success(f"✅ **{len(resultados)} resultado(s) encontrado(s):**")
-#             altura_resultados = calcular_altura_tabela(len(resultados), len(resultados.columns))
-#             st.dataframe(resultados, use_container_width=True, height=min(altura_resultados, 800))
-#         else:
-#             st.warning(f"⚠️ Nenhum resultado encontrado para '{texto_pesquisa}'")
-#     else:
-#         st.info("👆 Digite um termo acima para pesquisar nos dados")
+#     ... (código original comentado)
 
 # =========================================================
-# EXPORTAÇÃO
+# EXPORTAÇÃO (JÁ INTEGRADA NA TAB3)
 # =========================================================
-st.header("💾 Exportar Dados")
+# A exportação agora está integrada diretamente na tab3 com o botão de CSV
+# Mantendo a exportação completa em múltiplos formatos fora das tabs
+st.header("💾 Exportar Dados (Todos os Formatos)")
 
-df_exportar = df_filtrado if 'df_filtrado' in locals() and filtros_ativos and len(df_filtrado) > 0 else df
+df_exportar = df_final if 'df_final' in locals() and (filtros_ativos or termo_pesquisa) else df
 
 col_exp1, col_exp2, col_exp3 = st.columns(3)
 
@@ -1493,7 +1553,7 @@ with col_exp1:
     csv = df_exportar.to_csv(index=False, encoding='utf-8-sig')
     st.download_button(label="📥 Download CSV", data=csv, 
                       file_name=f"dados_cocred_{datetime.now().strftime('%Y%m%d_%H%M')}.csv",
-                      mime="text/csv", use_container_width=True)
+                      mime="text/csv", use_container_width=True, key="export_csv_global")
 
 with col_exp2:
     output = BytesIO()
@@ -1503,13 +1563,13 @@ with col_exp2:
     st.download_button(label="📥 Download Excel", data=excel_data,
                       file_name=f"dados_cocred_{datetime.now().strftime('%Y%m%d_%H%M')}.xlsx",
                       mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", 
-                      use_container_width=True)
+                      use_container_width=True, key="export_excel_global")
 
 with col_exp3:
     json_data = df_exportar.to_json(orient='records', force_ascii=False, date_format='iso')
     st.download_button(label="📥 Download JSON", data=json_data,
                       file_name=f"dados_cocred_{datetime.now().strftime('%Y%m%d_%H%M')}.json",
-                      mime="application/json", use_container_width=True)
+                      mime="application/json", use_container_width=True, key="export_json_global")
 
 # =========================================================
 # DEBUG INFO
@@ -1527,8 +1587,9 @@ if st.session_state.debug_mode:
         st.write(f"**Derivações:** {derivacoes}")
         st.write(f"**Extra Contrato:** {extra_contrato}")
         st.write(f"**Campanhas:** {campanhas_unicas}")
-        st.write(f"**Coluna Deadline:** {coluna_deadline if 'coluna_deadline' in locals() else 'Não encontrada'}")
-        st.write(f"**Template Plotly:** {plotly_template}")
+        st.write(f"**Filtros ativos:** {len(filtros_ativos) if 'filtros_ativos' in locals() else 0}")
+        st.write(f"**Resultados filtrados:** {len(df_final) if 'df_final' in locals() else 0}")
+        st.write(f"**Template Plotly:** {plotly_template if 'plotly_template' in locals() else 'N/A'}")
 
 # =========================================================
 # RODAPÉ
@@ -1547,7 +1608,7 @@ with footer_col3:
     st.markdown("""
     <div style="text-align: right;">
         <span style="color: #003366; font-weight: bold;">SICOOB COCRED</span> | 
-        <span style="color: #6C757D;">v4.2.0</span>
+        <span style="color: #6C757D;">v4.3.0</span>
     </div>
     """, unsafe_allow_html=True)
 
