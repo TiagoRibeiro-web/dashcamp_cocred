@@ -1235,16 +1235,16 @@ with tab3:
         else:
             st.metric(label="📅 Período", value="N/A")
     
-    with col_stats3:
-        if 'Status' in df.columns:
-            status_unicos = df['Status'].nunique()
-            st.metric(
-                label="🏷️ Status", 
-                value=status_unicos,
-                help="Quantidade de status diferentes"
-            )
-        else:
-            st.metric(label="🏷️ Status", value="N/A")
+    # with col_stats3:
+    #     if 'Status' in df.columns:
+    #         status_unicos = df['Status'].nunique()
+    #         st.metric(
+    #             label="🏷️ Status", 
+    #             value=status_unicos,
+    #             help="Quantidade de status diferentes"
+    #         )
+    #     else:
+    #         st.metric(label="🏷️ Status", value="N/A")
     
     with col_stats4:
         st.metric(
