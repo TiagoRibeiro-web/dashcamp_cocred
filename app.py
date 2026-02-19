@@ -813,7 +813,6 @@ with tab1:
 # =========================================================
 # TAB 2: KPIs COCRED
 # =========================================================
-# =========================================================
 # TAB 2: KPIs COCRED
 # =========================================================
 with tab2:
@@ -868,98 +867,78 @@ with tab2:
         st.markdown("""
         <div style="background: rgba(0, 51, 102, 0.1); padding: 10px; border-radius: 10px; margin-bottom: 10px;">
             <p style="margin: 0; font-size: 13px;">
-                <strong style="color: #003366;">📊 Todas as Campanhas</strong> - Distribuição completa do portfólio.
+                <strong style="color: #003366;">🏆 Top 10 Campanhas</strong> - Rankings das campanhas com maior volume.
             </p>
         </div>
         """, unsafe_allow_html=True)
-    
-    # PROcurar por coluna de campanha (várias possibilidades)
-    coluna_campanha = None
-    possiveis_nomes = ['Campanha', 'campanha', 'CAMPANHA', 'Nome da Campanha', 'Campanhas', 'campanhas']
-    
-    for col in df_kpi.columns:
-        if any(nome in col for nome in possiveis_nomes):
-            coluna_campanha = col
-            break
-    
-    if coluna_campanha:
-        # Debug (opcional - pode remover depois)
-        if st.session_state.get('debug_mode', False):
-            st.caption(f"🔍 Coluna encontrada: {coluna_campanha}")
         
-        # Todas as campanhas ordenadas por volume
-        todas_campanhas = df_kpi[coluna_campanha].value_counts().reset_index()
-        todas_campanhas.columns = ['Campanha', 'Demandas']
-        total_campanhas = len(todas_campanhas)
+        # Procurar por coluna de campanha (várias possibilidades)
+        coluna_campanha = None
+        possiveis_nomes = ['Campanha', 'campanha', 'CAMPANHA', 'Nome da Campanha', 'Campanhas', 'campanhas']
         
-        # Filtrar valores nulos ou vazios
-        todas_campanhas = todas_campanhas[todas_campanhas['Campanha'].notna()]
-        todas_campanhas = todas_campanhas[todas_campanhas['Campanha'] != '']
+        for col in df_kpi.columns:
+            if any(nome in col for nome in possiveis_nomes):
+                coluna_campanha = col
+                break
         
-        if not todas_campanhas.empty:
-            # Criar gráfico com todas as campanhas
-            fig_completo = px.bar(
-                todas_campanhas.sort_values('Demandas', ascending=True),
-                x='Demandas',
-                y='Campanha',
-                orientation='h',
-                title=f"Distribuição de Demandas por Campanha (Total: {total_campanhas} campanhas)",
-                color='Demandas',
-                color_continuous_scale='Blues',
-                text='Demandas',
-                template=plotly_template
-            )
+        if coluna_campanha:
+            # Top 10 campanhas
+            campanhas_top = df_kpi[coluna_campanha].value_counts().head(10).reset_index()
+            campanhas_top.columns = ['Campanha', 'Quantidade']
             
-            fig_completo.update_traces(
-                textposition='outside',
-                texttemplate='%{text}',
-                textfont=dict(size=10, color=text_color),
-                hovertemplate='<b>%{y}</b><br>Demandas: %{x}<extra></extra>'
-            )
+            # Filtrar valores nulos ou vazios
+            campanhas_top = campanhas_top[campanhas_top['Campanha'].notna()]
+            campanhas_top = campanhas_top[campanhas_top['Campanha'] != '']
             
-            fig_completo.update_layout(
-                height=min(600, 20 * total_campanhas),  # Altura dinâmica
-                xaxis_title="Número de Demandas",
-                yaxis_title="",
-                font=dict(color=text_color),
-                paper_bgcolor='rgba(0,0,0,0)',
-                plot_bgcolor='rgba(0,0,0,0)',
-                margin=dict(l=10, r=30, t=50, b=10),
-                coloraxis_showscale=False,  # Remove a barra de cores
-                hoverlabel=dict(bgcolor="white", font_size=12)
-            )
-            
-            # Configuração simples de zoom
-            st.plotly_chart(fig_completo, use_container_width=True, config={
-                'displayModeBar': True,
-                'modeBarButtonsToAdd': ['zoomIn', 'zoomOut', 'pan', 'resetScale'],
-                'displaylogo': False
-            })
-            
-            # Métricas simples
-            col_simples1, col_simples2 = st.columns(2)
-            
-            with col_simples1:
-                st.metric(
-                    label="📌 Total de Campanhas",
-                    value=total_campanhas
+            if not campanhas_top.empty:
+                fig_campanhas = px.bar(
+                    campanhas_top.sort_values('Quantidade', ascending=True),
+                    x='Quantidade',
+                    y='Campanha',
+                    orientation='h',
+                    title='Top 10 Campanhas por Volume',
+                    color='Quantidade',
+                    color_continuous_scale='Blues',
+                    text='Quantidade',
+                    template=plotly_template
                 )
-            
-            with col_simples2:
-                total_demandas = todas_campanhas['Demandas'].sum()
-                st.metric(
-                    label="📊 Total de Demandas",
-                    value=total_demandas
+                
+                fig_campanhas.update_traces(
+                    textposition='outside',
+                    texttemplate='%{text}',
+                    textfont=dict(size=12, color=text_color),
+                    hovertemplate='<b>%{y}</b><br>Demandas: %{x}<extra></extra>'
                 )
+                
+                fig_campanhas.update_layout(
+                    height=400,
+                    xaxis_title="Número de Demandas",
+                    yaxis_title="",
+                    showlegend=False,
+                    font=dict(color=text_color),
+                    paper_bgcolor='rgba(0,0,0,0)',
+                    plot_bgcolor='rgba(0,0,0,0)',
+                    margin=dict(l=10, r=30, t=40, b=10)
+                )
+                st.plotly_chart(fig_campanhas, use_container_width=True, config={'displayModeBar': False})
+                
+                # Métrica simples do Top 1
+                top1_campanha = campanhas_top.iloc[-1]['Campanha']  # O último após ordenar é o maior
+                top1_valor = campanhas_top.iloc[-1]['Quantidade']
+                
+                if len(top1_campanha) > 50:
+                    st.caption(f"🥇 **Líder:** {top1_campanha[:50]}... ({top1_valor} demandas)")
+                else:
+                    st.caption(f"🥇 **Líder:** {top1_campanha} ({top1_valor} demandas)")
+            else:
+                st.info("ℹ️ Dados de campanha não disponíveis")
         else:
-            st.warning("⚠️ Coluna de campanha encontrada, mas sem dados válidos")
-    else:
-        # Se não encontrar coluna de campanha, mostrar as colunas disponíveis (modo debug)
-        st.warning("ℹ️ Dados de campanha não disponíveis")
-        
-        if st.session_state.get('debug_mode', False):
-            st.caption("📋 Colunas disponíveis no DataFrame:")
-            st.write(df_kpi.columns.tolist())
+            st.info("ℹ️ Dados de campanha não disponíveis")
+            
+            # Modo debug (opcional)
+            if st.session_state.get('debug_mode', False):
+                st.caption("📋 Colunas disponíveis:")
+                st.write(df_kpi.columns.tolist())
     
     with col_chart2:
         st.markdown("""
