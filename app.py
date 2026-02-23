@@ -328,6 +328,18 @@ if 'Campanha' in df.columns:
     campanhas_unicas = df['Campanha'].nunique()
 else:
     campanhas_unicas = len(df['ID'].unique()) // 50 if 'ID' in df.columns else 12
+    
+if 'df' not in st.session_state:
+    st.session_state.df = df
+    st.session_state.total_linhas = total_linhas
+    st.session_state.total_colunas = total_colunas
+    st.session_state.total_concluidos = total_concluidos
+    st.session_state.total_alta = total_alta
+    st.session_state.total_hoje = total_hoje
+    st.session_state.criacoes = criacoes
+    st.session_state.derivacoes = derivacoes
+    st.session_state.extra_contrato = extra_contrato
+    st.session_state.campanhas_unicas = campanhas_unicas    
 
 # =========================================================
 # SIDEBAR
