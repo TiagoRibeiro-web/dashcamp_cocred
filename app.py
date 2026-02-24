@@ -438,7 +438,7 @@ with st.sidebar:
         <p style="margin: 0;">Desenvolvido para</p>
         <p style="margin: 0; font-weight: bold; color: #003366;">SICOOB COCRED</p>
         <p style="margin: 5px 0 0 0;">© 2026 - Ideatore</p>
-        <p style="margin: 5px 0 0 0;">v4.3.0</p>
+        <p style="margin: 5px 0 0 0;">v4.4.0</p>
     </div>
     """, unsafe_allow_html=True)
 
@@ -468,9 +468,6 @@ tab1, tab2, tab3 = st.tabs([
     "📋 Explorador de Dados"
 ])
 
-# =========================================================
-# TAB 1: ANÁLISE ESTRATÉGICA
-# =========================================================
 # =========================================================
 # TAB 1: ANÁLISE ESTRATÉGICA
 # =========================================================
@@ -607,7 +604,7 @@ with tab1:
     
     st.divider()
     
-    # ========== 3. ANÁLISE TEMPORAL COMPLETA (AGORA DENTRO DA TAB1!) ==========
+    # ========== 3. ANÁLISE TEMPORAL COMPLETA ==========
     if 'Data de Solicitação' in df.columns:
         st.markdown("""
         <div class="info-container-cocred">
@@ -617,7 +614,7 @@ with tab1:
         </div>
         """, unsafe_allow_html=True)
         
-        # Preparar dados temporais (criar cópia para não modificar o df original fora da tab)
+        # Preparar dados temporais
         df_temp = df.copy()
         df_temp['Mês/Ano'] = df_temp['Data de Solicitação'].dt.to_period('M').astype(str)
         df_temp['Ano'] = df_temp['Data de Solicitação'].dt.year
@@ -635,7 +632,7 @@ with tab1:
         evolucao_mensal.columns = ['Período', 'Quantidade']
         
         # Layout: 4 colunas de métricas no topo
-        col_temp1, col_temp4 = st.columns(2)
+        col_temp1, col_temp2, col_temp4 = st.columns(3)
         
         with col_temp1:
             total_ano = len(df_temp[df_temp['Ano'] == ano_atual])
@@ -645,25 +642,20 @@ with tab1:
                 help="Total de solicitações no ano atual"
             )
         
-               
-        # with col_temp3:
-        #     if len(evolucao_mensal) >= 12:
-        #         # Procurar o mesmo mês do ano anterior
-        #         mesmo_mes_ano_anterior = evolucao_mensal[evolucao_mensal['Período'].str.contains(f"{ano_atual-1}-{mes_atual:02d}", na=False)]
-        #         if not mesmo_mes_ano_anterior.empty and len(evolucao_mensal) > 0:
-        #             ultimo_mes = evolucao_mensal.iloc[-1]['Quantidade']
-        #             valor_ano_anterior = mesmo_mes_ano_anterior.iloc[0]['Quantidade']
-        #             variacao_anual = ((ultimo_mes - valor_ano_anterior) / valor_ano_anterior * 100) if valor_ano_anterior > 0 else 0
-            #         st.metric(
-            #             label="📊 Vs Ano Anterior", 
-            #             value=f"{variacao_anual:+.1f}%",
-            #             delta_color="normal",
-            #             help=f"Comparação com {mes_atual}/{ano_atual-1}"
-            #         )
-            #     else:
-            #         st.metric(label="📊 Vs Ano Anterior", value="N/A")
-            # else:
-            #     st.metric(label="📊 Vs Ano Anterior", value="N/A")
+        with col_temp2:
+            if len(evolucao_mensal) >= 2:
+                ultimo_mes = evolucao_mensal.iloc[-1]['Quantidade']
+                penultimo_mes = evolucao_mensal.iloc[-2]['Quantidade']
+                variacao_mensal = ((ultimo_mes - penultimo_mes) / penultimo_mes * 100) if penultimo_mes > 0 else 0
+                st.metric(
+                    label="📈 Vs Mês Anterior", 
+                    value=ultimo_mes,
+                    delta=f"{variacao_mensal:+.1f}%",
+                    delta_color="normal",
+                    help="Comparação com o mês anterior"
+                )
+            else:
+                st.metric(label="📈 Vs Mês Anterior", value="N/A")
         
         with col_temp4:
             if not evolucao_mensal.empty:
@@ -752,7 +744,7 @@ with tab1:
                     </div>
                     """, unsafe_allow_html=True)
         
-        # Análise de dia da semana (se houver dados suficientes)
+        # Análise de dia da semana
         if len(df_temp) > 30:
             st.divider()
             
@@ -796,11 +788,9 @@ with tab1:
                     plot_bgcolor='rgba(0,0,0,0)'
                 )
                 st.plotly_chart(fig_dias, use_container_width=True, config={'displayModeBar': False})
+
 # =========================================================
-# TAB 2: KPIs COCRED
-# =========================================================
-# =========================================================
-# TAB 2: KPIs COCRED (COM FILTROS AVANÇADOS IGUAIS À TAB 3!)
+# TAB 2: KPIs COCRED (COM FILTROS AVANÇADOS COMPLETOS)
 # =========================================================
 with tab2:
     st.markdown("## 🎯 KPIs - Campanhas COCRED")
@@ -811,7 +801,7 @@ with tab2:
     text_color = 'white' if is_dark else 'black'
     
     # =========================================================
-    # FILTROS AVANÇADOS - CÓPIA IDÊNTICA DA TAB 3!
+    # FILTROS AVANÇADOS - CÓPIA IDÊNTICA DA TAB 3 COM QUINZENA!
     # =========================================================
     with st.container():
         st.markdown("##### 🔍 Filtros Avançados")
@@ -875,7 +865,7 @@ with tab2:
                         "Escolha:",
                         ["1ª quinzena (1-15)", "2ª quinzena (16-31)"],
                         horizontal=True,
-                        key="tab2_quinzena_opcao",
+                        key="tab2_data_quinzena_opcao",
                         label_visibility="collapsed"
                     )
                     
@@ -931,7 +921,7 @@ with tab2:
             if coluna_deadline:
                 periodo_deadline = st.selectbox(
                     "⏰ Deadline", 
-                    ["Todos", "Hoje", "Esta semana", "Este mês", "Próximos 7 dias", "Próximos 30 dias", "Atrasados", "Personalizado"],
+                    ["Todos", "Hoje", "Esta semana", "Este mês", "Quinzena", "Próximos 7 dias", "Próximos 30 dias", "Atrasados", "Personalizado"],
                     key="tab2_periodo_deadline"
                 )
                 
@@ -962,6 +952,33 @@ with tab2:
                             filtros_ativos_tab2['deadline_fim'] = ultimo_dia
                             filtros_ativos_tab2['tem_filtro_deadline'] = True
                             filtros_ativos_tab2['coluna_deadline'] = coluna_deadline
+                        elif periodo_deadline == "Quinzena":
+                            quinzena_opcao = st.radio(
+                                "Escolha:",
+                                ["1ª quinzena (1-15)", "2ª quinzena (16-31)"],
+                                horizontal=True,
+                                key="tab2_deadline_quinzena_opcao",
+                                label_visibility="collapsed"
+                            )
+                            
+                            ano_atual = hoje.year
+                            mes_atual = hoje.month
+                            
+                            if quinzena_opcao == "1ª quinzena (1-15)":
+                                data_inicio_quinzena = date(ano_atual, mes_atual, 1)
+                                data_fim_quinzena = date(ano_atual, mes_atual, 15)
+                            else:
+                                ultimo_dia = (date(ano_atual, mes_atual, 1) + timedelta(days=32)).replace(day=1) - timedelta(days=1)
+                                data_inicio_quinzena = date(ano_atual, mes_atual, 16)
+                                data_fim_quinzena = ultimo_dia
+                            
+                            filtros_ativos_tab2['deadline_inicio'] = data_inicio_quinzena
+                            filtros_ativos_tab2['deadline_fim'] = data_fim_quinzena
+                            filtros_ativos_tab2['tem_filtro_deadline'] = True
+                            filtros_ativos_tab2['coluna_deadline'] = coluna_deadline
+                            
+                            st.caption(f"📅 {data_inicio_quinzena.strftime('%d/%m')} a {data_fim_quinzena.strftime('%d/%m')}")
+                            
                         elif periodo_deadline == "Próximos 7 dias":
                             filtros_ativos_tab2['deadline_inicio'] = hoje
                             filtros_ativos_tab2['deadline_fim'] = hoje + timedelta(days=7)
@@ -1004,7 +1021,7 @@ with tab2:
             if coluna_entrega:
                 periodo_entrega = st.selectbox(
                     "📦 Data de Entrega", 
-                    ["Todos", "Hoje", "Esta semana", "Este mês", "Últimos 7 dias", "Últimos 30 dias", "Personalizado"],
+                    ["Todos", "Hoje", "Esta semana", "Este mês", "Quinzena", "Últimos 7 dias", "Últimos 30 dias", "Personalizado"],
                     key="tab2_periodo_entrega"
                 )
                 
@@ -1035,6 +1052,33 @@ with tab2:
                             filtros_ativos_tab2['entrega_fim'] = ultimo_dia
                             filtros_ativos_tab2['tem_filtro_entrega'] = True
                             filtros_ativos_tab2['coluna_entrega'] = coluna_entrega
+                        elif periodo_entrega == "Quinzena":
+                            quinzena_opcao = st.radio(
+                                "Escolha:",
+                                ["1ª quinzena (1-15)", "2ª quinzena (16-31)"],
+                                horizontal=True,
+                                key="tab2_entrega_quinzena_opcao",
+                                label_visibility="collapsed"
+                            )
+                            
+                            ano_atual = hoje.year
+                            mes_atual = hoje.month
+                            
+                            if quinzena_opcao == "1ª quinzena (1-15)":
+                                data_inicio_quinzena = date(ano_atual, mes_atual, 1)
+                                data_fim_quinzena = date(ano_atual, mes_atual, 15)
+                            else:
+                                ultimo_dia = (date(ano_atual, mes_atual, 1) + timedelta(days=32)).replace(day=1) - timedelta(days=1)
+                                data_inicio_quinzena = date(ano_atual, mes_atual, 16)
+                                data_fim_quinzena = ultimo_dia
+                            
+                            filtros_ativos_tab2['entrega_inicio'] = data_inicio_quinzena
+                            filtros_ativos_tab2['entrega_fim'] = data_fim_quinzena
+                            filtros_ativos_tab2['tem_filtro_entrega'] = True
+                            filtros_ativos_tab2['coluna_entrega'] = coluna_entrega
+                            
+                            st.caption(f"📅 {data_inicio_quinzena.strftime('%d/%m')} a {data_fim_quinzena.strftime('%d/%m')}")
+                            
                         elif periodo_entrega == "Últimos 7 dias":
                             filtros_ativos_tab2['entrega_inicio'] = hoje - timedelta(days=7)
                             filtros_ativos_tab2['entrega_fim'] = hoje
@@ -1116,12 +1160,6 @@ with tab2:
         st.info(f"🔍 **Filtros ativos:** {total_kpi} de {total_linhas} registros ({total_kpi/total_linhas*100:.1f}%)")
     
     st.divider()
-    
-    # ========== RESTO DA TAB 2 CONTINUA IGUAL! ==========
-    # (Todo o código existente da Tab 2 permanece exatamente igual)
-    # Gráficos, botões, tabelas, etc. - NADA MUDA!
-    
-    # ... (aqui continua TODO o código original da Tab 2 a partir da linha onde estavam os filtros antigos)
     
     # ========== GRÁFICOS INTERATIVOS ==========
     
@@ -1437,9 +1475,9 @@ with tab2:
                 st.metric("Total Origens", len(origem_counts))
             with col_orig2:
                 st.metric("Total Demandas", origem_counts['Quantidade'].sum())
-            # with col_orig3:
-            #     media_origem = origem_counts['Quantidade'].mean()
-            #     st.metric("Média por Origem", f"{media_origem:.0f}")
+            with col_orig3:
+                media_origem = origem_counts['Quantidade'].mean()
+                st.metric("Média por Origem", f"{media_origem:.0f}")
         else:
             st.info("ℹ️ Dados de origem não disponíveis")
             
@@ -1465,8 +1503,9 @@ with tab2:
         })
         
         st.dataframe(origem_exemplo, use_container_width=True, height=350, hide_index=True)
+
 # =========================================================
-# TAB 3: EXPLORADOR DE DADOS (COM FILTRO DE DATA DE ENTREGA)
+# TAB 3: EXPLORADOR DE DADOS (COM FILTRO DE DATA DE ENTREGA E QUINZENA!)
 # =========================================================
 with tab3:
     st.markdown("## 📋 Explorador de Dados")
@@ -1495,17 +1534,6 @@ with tab3:
         else:
             st.metric(label="📅 Vigência", value="N/A")
     
-    # with col_stats3:
-    #     if 'Status' in df.columns:
-    #         status_unicos = df['Status'].nunique()
-    #         st.metric(
-    #             label="🏷️ Status", 
-    #             value=status_unicos,
-    #             help="Quantidade de status diferentes"
-    #         )
-    #     else:
-    #         st.metric(label="🏷️ Status", value="N/A")
-    
     with col_stats4:
         st.metric(
             label="🔄 Atualização", 
@@ -1516,7 +1544,7 @@ with tab3:
     st.divider()
     
     # =========================================================
-    # FILTROS AVANÇADOS (AGORA COM DATA DE ENTREGA!)
+    # FILTROS AVANÇADOS (COM DATA DE ENTREGA E QUINZENA!)
     # =========================================================
     with st.container():
         st.markdown("##### 🔍 Filtros Avançados")
@@ -1547,7 +1575,7 @@ with tab3:
                 if producao_selecionada != 'Todos':
                     filtros_ativos['Produção'] = producao_selecionada
         
-        # Segunda linha de filtros (datas) - AGORA COM 4 COLUNAS!
+        # Segunda linha de filtros (datas) - 4 COLUNAS!
         col_f4, col_f5, col_f6, col_f7 = st.columns([2, 2, 2, 1])
         
         with col_f4:
@@ -1579,7 +1607,7 @@ with tab3:
                         "Escolha:",
                         ["1ª quinzena (1-15)", "2ª quinzena (16-31)"],
                         horizontal=True,
-                        key="quinzena_opcao",
+                        key="tab3_data_quinzena_opcao",
                         label_visibility="collapsed"
                     )
                     
@@ -1635,7 +1663,7 @@ with tab3:
             if coluna_deadline:
                 periodo_deadline = st.selectbox(
                     "⏰ Deadline", 
-                    ["Todos", "Hoje", "Esta semana", "Este mês", "Próximos 7 dias", "Próximos 30 dias", "Atrasados", "Personalizado"],
+                    ["Todos", "Hoje", "Esta semana", "Este mês", "Quinzena", "Próximos 7 dias", "Próximos 30 dias", "Atrasados", "Personalizado"],
                     key="tab3_periodo_deadline"
                 )
                 
@@ -1666,6 +1694,33 @@ with tab3:
                             filtros_ativos['deadline_fim'] = ultimo_dia
                             filtros_ativos['tem_filtro_deadline'] = True
                             filtros_ativos['coluna_deadline'] = coluna_deadline
+                        elif periodo_deadline == "Quinzena":
+                            quinzena_opcao = st.radio(
+                                "Escolha:",
+                                ["1ª quinzena (1-15)", "2ª quinzena (16-31)"],
+                                horizontal=True,
+                                key="tab3_deadline_quinzena_opcao",
+                                label_visibility="collapsed"
+                            )
+                            
+                            ano_atual = hoje.year
+                            mes_atual = hoje.month
+                            
+                            if quinzena_opcao == "1ª quinzena (1-15)":
+                                data_inicio_quinzena = date(ano_atual, mes_atual, 1)
+                                data_fim_quinzena = date(ano_atual, mes_atual, 15)
+                            else:
+                                ultimo_dia = (date(ano_atual, mes_atual, 1) + timedelta(days=32)).replace(day=1) - timedelta(days=1)
+                                data_inicio_quinzena = date(ano_atual, mes_atual, 16)
+                                data_fim_quinzena = ultimo_dia
+                            
+                            filtros_ativos['deadline_inicio'] = data_inicio_quinzena
+                            filtros_ativos['deadline_fim'] = data_fim_quinzena
+                            filtros_ativos['tem_filtro_deadline'] = True
+                            filtros_ativos['coluna_deadline'] = coluna_deadline
+                            
+                            st.caption(f"📅 {data_inicio_quinzena.strftime('%d/%m')} a {data_fim_quinzena.strftime('%d/%m')}")
+                            
                         elif periodo_deadline == "Próximos 7 dias":
                             filtros_ativos['deadline_inicio'] = hoje
                             filtros_ativos['deadline_fim'] = hoje + timedelta(days=7)
@@ -1695,7 +1750,6 @@ with tab3:
                 st.selectbox("⏰ Deadline", ["Indisponível"], disabled=True, key="tab3_deadline_disabled")
         
         with col_f6:
-            # NOVO FILTRO: DATA DE ENTREGA!
             # Procurar por colunas de data de entrega
             coluna_entrega = None
             for col in df.columns:
@@ -1709,7 +1763,7 @@ with tab3:
             if coluna_entrega:
                 periodo_entrega = st.selectbox(
                     "📦 Data de Entrega", 
-                    ["Todos", "Hoje", "Esta semana", "Este mês", "Últimos 7 dias", "Últimos 30 dias", "Personalizado"],
+                    ["Todos", "Hoje", "Esta semana", "Este mês", "Quinzena", "Últimos 7 dias", "Últimos 30 dias", "Personalizado"],
                     key="tab3_periodo_entrega"
                 )
                 
@@ -1740,6 +1794,33 @@ with tab3:
                             filtros_ativos['entrega_fim'] = ultimo_dia
                             filtros_ativos['tem_filtro_entrega'] = True
                             filtros_ativos['coluna_entrega'] = coluna_entrega
+                        elif periodo_entrega == "Quinzena":
+                            quinzena_opcao = st.radio(
+                                "Escolha:",
+                                ["1ª quinzena (1-15)", "2ª quinzena (16-31)"],
+                                horizontal=True,
+                                key="tab3_entrega_quinzena_opcao",
+                                label_visibility="collapsed"
+                            )
+                            
+                            ano_atual = hoje.year
+                            mes_atual = hoje.month
+                            
+                            if quinzena_opcao == "1ª quinzena (1-15)":
+                                data_inicio_quinzena = date(ano_atual, mes_atual, 1)
+                                data_fim_quinzena = date(ano_atual, mes_atual, 15)
+                            else:
+                                ultimo_dia = (date(ano_atual, mes_atual, 1) + timedelta(days=32)).replace(day=1) - timedelta(days=1)
+                                data_inicio_quinzena = date(ano_atual, mes_atual, 16)
+                                data_fim_quinzena = ultimo_dia
+                            
+                            filtros_ativos['entrega_inicio'] = data_inicio_quinzena
+                            filtros_ativos['entrega_fim'] = data_fim_quinzena
+                            filtros_ativos['tem_filtro_entrega'] = True
+                            filtros_ativos['coluna_entrega'] = coluna_entrega
+                            
+                            st.caption(f"📅 {data_inicio_quinzena.strftime('%d/%m')} a {data_fim_quinzena.strftime('%d/%m')}")
+                            
                         elif periodo_entrega == "Últimos 7 dias":
                             filtros_ativos['entrega_inicio'] = hoje - timedelta(days=7)
                             filtros_ativos['entrega_fim'] = hoje
@@ -1764,8 +1845,12 @@ with tab3:
                 st.selectbox("📦 Data de Entrega", ["Indisponível"], disabled=True, key="tab3_entrega_disabled")
         
         with col_f7:
-            st.markdown("<br>", unsafe_allow_html=True)  # Espaço para alinhar com os selects acima
-            aplicar_filtros = st.button("🔍 Aplicar Filtros", type="primary", use_container_width=True, key="tab3_aplicar_filtros")
+            st.markdown("<br>", unsafe_allow_html=True)
+            if st.button("🧹 Limpar Tudo", use_container_width=True, key="tab3_limpar_filtros"):
+                for key in list(st.session_state.keys()):
+                    if key.startswith('tab3_'):
+                        del st.session_state[key]
+                st.rerun()
     
     st.divider()
     
@@ -1813,7 +1898,7 @@ with tab3:
                     (df_export[col_deadline] <= deadline_fim)
                 ]
         
-        # Aplicar filtro de data de entrega (NOVO!)
+        # Aplicar filtro de data de entrega
         if 'tem_filtro_entrega' in filtros_ativos and 'coluna_entrega' in filtros_ativos:
             col_entrega = filtros_ativos['coluna_entrega']
             if col_entrega in df_export.columns:
@@ -1848,7 +1933,7 @@ with tab3:
     with col_clear:
         st.markdown("<br>", unsafe_allow_html=True)
         if filtros_ativos or (termo_pesquisa and termo_pesquisa.strip() != ""):
-            if st.button("🧹 Limpar Tudo", use_container_width=True, key="tab3_limpar"):
+            if st.button("🧹 Limpar Tudo", use_container_width=True, key="tab3_limpar_tudo"):
                 for key in list(st.session_state.keys()):
                     if key.startswith('tab3_'):
                         del st.session_state[key]
@@ -1886,7 +1971,7 @@ with tab3:
                 (df_final[col_deadline] <= deadline_fim)
             ]
     
-    # Aplicar filtro de data de entrega (NOVO!)
+    # Aplicar filtro de data de entrega
     if 'tem_filtro_entrega' in filtros_ativos and 'coluna_entrega' in filtros_ativos:
         col_entrega = filtros_ativos['coluna_entrega']
         if col_entrega in df_final.columns:
@@ -1978,13 +2063,6 @@ with tab3:
         st.warning("⚠️ Nenhum registro encontrado com os filtros e pesquisa atuais.")
 
 # =========================================================
-# SEÇÃO DE PESQUISA (COMENTADA NO ORIGINAL - MANTIDA PARA REFERÊNCIA)
-# =========================================================
-# with tab3:
-#     st.subheader("🔍 Pesquisa nos Dados")
-#     ... (código original comentado)
-
-# =========================================================
 # EXPORTAÇÃO (COMPLETA EM MÚLTIPLOS FORMATOS)
 # =========================================================
 st.header("💾 Exportar Dados (Todos os Formatos)")
@@ -2052,7 +2130,7 @@ with footer_col3:
     st.markdown("""
     <div style="text-align: right;">
         <span style="color: #003366; font-weight: bold;">SICOOB COCRED</span> | 
-        <span style="color: #6C757D;">v4.3.0</span>
+        <span style="color: #6C757D;">v4.5.0</span>
     </div>
     """, unsafe_allow_html=True)
 
