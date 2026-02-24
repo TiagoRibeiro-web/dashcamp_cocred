@@ -645,21 +645,7 @@ with tab1:
                 help="Total de solicitações no ano atual"
             )
         
-        # with col_temp2:
-        #     if len(evolucao_mensal) >= 2:
-        #         ultimo_mes = evolucao_mensal.iloc[-1]['Quantidade']
-        #         penultimo_mes = evolucao_mensal.iloc[-2]['Quantidade']
-        #         variacao_mensal = ((ultimo_mes - penultimo_mes) / penultimo_mes * 100) if penultimo_mes > 0 else 0
-        #         # st.metric(
-        #         #     label="📈 Vs Mês Anterior", 
-        #         #     value=ultimo_mes,
-        #         #     delta=f"{variacao_mensal:+.1f}%",
-        #         #     delta_color="normal",
-        #         #     help="Comparação com o mês anterior"
-        #         # )
-        #     else:
-        #         st.metric(label="📈 Vs Mês Anterior", value="N/A")
-        
+               
         # with col_temp3:
         #     if len(evolucao_mensal) >= 12:
         #         # Procurar o mesmo mês do ano anterior
