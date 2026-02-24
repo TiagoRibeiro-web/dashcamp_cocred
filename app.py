@@ -1451,9 +1451,9 @@ with tab2:
                 st.metric("Total Origens", len(origem_counts))
             with col_orig2:
                 st.metric("Total Demandas", origem_counts['Quantidade'].sum())
-            with col_orig3:
-                media_origem = origem_counts['Quantidade'].mean()
-                st.metric("Média por Origem", f"{media_origem:.0f}")
+            # with col_orig3:
+            #     media_origem = origem_counts['Quantidade'].mean()
+            #     st.metric("Média por Origem", f"{media_origem:.0f}")
         else:
             st.info("ℹ️ Dados de origem não disponíveis")
             
