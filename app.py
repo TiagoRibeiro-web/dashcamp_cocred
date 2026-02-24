@@ -399,7 +399,7 @@ with st.sidebar:
     
     with col_m2:
         percentual_concluidos = (total_concluidos / total_linhas * 100) if total_linhas > 0 else 0
-        st.metric(label="✅ Concluídos/Aprovados", value=f"{total_concluidos:,}", delta=f"{percentual_concluidos:.0f}%")
+        st.metric(label="✅ Concluídos/Aprovados", value=f"{total_concluidos:,}") #, delta=f"{percentual_concluidos:.0f}%")
     
     col_m3, col_m4 = st.columns(2)
     
