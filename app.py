@@ -632,7 +632,7 @@ with tab1:
         evolucao_mensal.columns = ['Período', 'Quantidade']
         
         # Layout: 4 colunas de métricas no topo
-        col_temp1, col_temp2, col_temp4 = st.columns(3)
+        col_temp1, col_temp4 = st.columns(2)
         
         with col_temp1:
             total_ano = len(df_temp[df_temp['Ano'] == ano_atual])
@@ -642,20 +642,7 @@ with tab1:
                 help="Total de solicitações no ano atual"
             )
         
-        with col_temp2:
-            if len(evolucao_mensal) >= 2:
-                ultimo_mes = evolucao_mensal.iloc[-1]['Quantidade']
-                penultimo_mes = evolucao_mensal.iloc[-2]['Quantidade']
-                variacao_mensal = ((ultimo_mes - penultimo_mes) / penultimo_mes * 100) if penultimo_mes > 0 else 0
-                st.metric(
-                    label="📈 Vs Mês Anterior", 
-                    value=ultimo_mes,
-                    delta=f"{variacao_mensal:+.1f}%",
-                    delta_color="normal",
-                    help="Comparação com o mês anterior"
-                )
-            else:
-                st.metric(label="📈 Vs Mês Anterior", value="N/A")
+        
         
         with col_temp4:
             if not evolucao_mensal.empty:
