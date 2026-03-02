@@ -2519,7 +2519,7 @@ with tab4:
         df_camp = df_camp.sort_values('Total Demandas', ascending=False).reset_index(drop=True)
     
     # =========================================================
-    # SELETOR DE CAMPANHA (NOVO!)
+    # SELETOR DE CAMPANHA
     # =========================================================
     st.markdown("### 🎯 Selecionar Campanha")
     
@@ -2542,7 +2542,7 @@ with tab4:
             st.rerun()
     
     # =========================================================
-    # MÉTRICAS DA CAMPANHA SELECIONADA (se não for "Todas")
+    # MÉTRICAS DA CAMPANHA SELECIONADA (SEM TAXA)
     # =========================================================
     if campanha_selecionada != 'Todas':
         # Filtrar dados da campanha
@@ -2550,19 +2550,17 @@ with tab4:
         
         # Mostrar métricas da campanha
         st.markdown(f"### 📊 Detalhes: {campanha_selecionada}")
-        col_m1, col_m2, col_m3 = st.columns(3)
+        col_m1, col_m2 = st.columns(2)
         
         with col_m1:
             st.metric("Total Demandas", int(df_camp_sel['Total Demandas']))
         with col_m2:
-            st.metric("Taxa de Conclusão", f"{df_camp_sel['Taxa Conclusão']}%")
-        with col_m3:
             st.metric("Período", df_camp_sel['Período'])
         
         st.divider()
     
     # =========================================================
-    # TABELA EXPANSÍVEL DE CAMPANHAS (filtrada pela seleção)
+    # TABELA EXPANSÍVEL DE CAMPANHAS
     # =========================================================
     st.markdown("### 📋 Lista de Campanhas")
     
@@ -2596,8 +2594,8 @@ with tab4:
             st.metric("Total Campanhas", len(df_tabela))
         with col_res2:
             st.metric("Total Demandas", int(df_tabela['Total Demandas'].sum()))
-        # with col_res3:
-        #     st.metric("Média Taxa", f"{df_tabela['Taxa Conclusão'].mean():.1f}%")
+        with col_res3:
+            st.metric("Taxa Média", f"{df_tabela['Taxa Conclusão'].mean():.1f}%")
         
         st.divider()
     
@@ -2641,7 +2639,7 @@ with tab4:
                     else:
                         st.metric("Taxa", "N/A")
                 
-                # Mostrar tabela de demandas
+                # Mostrar tabela de demandas (TODAS, sem limite)
                 colunas_display = []
                 for col in ['ID', 'Status', 'Prioridade', 'Data de Solicitação', 'Deadline', 'Tipo', 'Solicitante']:
                     if col in demandas_campanha.columns:
@@ -2649,11 +2647,12 @@ with tab4:
                 
                 if colunas_display:
                     st.dataframe(
-                        demandas_campanha[colunas_display],
+                        demandas_campanha[colunas_display],  # SEM HEAD(10) - MOSTRA TUDO!
                         use_container_width=True,
-                        height=min(500, len(demandas_campanha) * 35 + 50),  # Altura dinâmica com limite
+                        height=min(500, len(demandas_campanha) * 35 + 50),  # Altura dinâmica
                         hide_index=True
                     )
+                    st.caption(f"Total: {len(demandas_campanha)} demandas")
             
             st.divider()
 # =========================================================
