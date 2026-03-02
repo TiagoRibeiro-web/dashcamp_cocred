@@ -2050,7 +2050,7 @@ with tab3:
     else:
         st.warning("⚠️ Nenhum registro encontrado com os filtros e pesquisa atuais.")
 # =========================================================
-# TAB 4: ANÁLISE DE CAMPANHAS (VERSÃO FINAL)
+# TAB 4: ANÁLISE DE CAMPANHAS (COM TOOLTIPS)
 # =========================================================
 with tab4:
     st.markdown("## 📋 Catálogo de Campanhas")
@@ -2595,7 +2595,11 @@ with tab4:
         with col_res2:
             st.metric("Total Demandas", int(df_tabela['Total Demandas'].sum()))
         with col_res3:
-            st.metric("Taxa Média", f"{df_tabela['Taxa Conclusão'].mean():.1f}%")
+            st.metric(
+                "Taxa Média", 
+                f"{df_tabela['Taxa Conclusão'].mean():.1f}%",
+                help="Média das taxas individuais de cada campanha. Cada taxa é calculada como (demandas concluídas ÷ total de demandas) × 100"
+            )
         
         st.divider()
     
@@ -2612,7 +2616,10 @@ with tab4:
             with cols[2]:
                 st.markdown(f"**{int(row['Total Demandas'])}**")
             with cols[3]:
-                st.markdown(f"**{row['Taxa Conclusão']}%**")
+                st.markdown(
+                    f"**{row['Taxa Conclusão']}%**",
+                    help="Taxa calculada com base em demandas com status 'Concluído' ou 'Aprovado'"
+                )
             with cols[4]:
                 if 'Solicitantes' in row:
                     st.markdown(f"_{row['Solicitantes']}_")
@@ -2647,9 +2654,9 @@ with tab4:
                 
                 if colunas_display:
                     st.dataframe(
-                        demandas_campanha[colunas_display],  # SEM HEAD(10) - MOSTRA TUDO!
+                        demandas_campanha[colunas_display],
                         use_container_width=True,
-                        height=min(500, len(demandas_campanha) * 35 + 50),  # Altura dinâmica
+                        height=min(500, len(demandas_campanha) * 35 + 50),
                         hide_index=True
                     )
                     st.caption(f"Total: {len(demandas_campanha)} demandas")
