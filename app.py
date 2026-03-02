@@ -2159,20 +2159,48 @@ with tab4:
                 if 'Total Demandas' not in df_camp.columns:
                     df_camp['Total Demandas'] = 1
                 
-                # Calcular métricas adicionais de forma segura
+                # =========================================================
+                # CALCULAR MÉTRICAS ADICIONAIS (CORRIGIDO!)
+                # =========================================================
+                
+                # Calcular duração se houver datas
                 if 'Data Início' in df_camp.columns and 'Data Fim' in df_camp.columns:
                     df_camp['Duração (dias)'] = (df_camp['Data Fim'] - df_camp['Data Início']).dt.days
                     df_camp['Duração (dias)'] = df_camp['Duração (dias)'].clip(lower=0)
                 
-                if 'Entregues' in df_camp.columns and 'Total Demandas' in df_camp.columns:
-                    df_camp['Taxa Conclusão'] = (df_camp['Entregues'] / df_camp['Total Demandas'] * 100).round(1)
+                # CALCULAR TAXA DE CONCLUSÃO BASEADA EM STATUS (CORREÇÃO!)
+                if 'Status' in df_camp_valid.columns:
+                    # Calcular taxa para cada campanha
+                    taxas_conclusao = []
+                    
+                    for campanha in df_camp['Campanha']:
+                        # Pegar todos os registros desta campanha
+                        mask = df_camp_valid[df_camp_valid[coluna_campanha] == campanha]
+                        
+                        if len(mask) > 0:
+                            # Contar quantos têm status de concluído/aprovado
+                            concluidos = len(mask[mask['Status'].str.contains('Concluído|Aprovado', na=False, case=False)])
+                            taxa = (concluidos / len(mask) * 100) if len(mask) > 0 else 0
+                            taxas_conclusao.append(round(taxa, 1))
+                        else:
+                            taxas_conclusao.append(0)
+                    
+                    df_camp['Taxa Conclusão'] = taxas_conclusao
                 else:
-                    df_camp['Taxa Conclusão'] = 0
+                    # Fallback: usar entregues se disponível
+                    if 'Entregues' in df_camp.columns:
+                        df_camp['Taxa Conclusão'] = (df_camp['Entregues'] / df_camp['Total Demandas'] * 100).round(1)
+                    else:
+                        df_camp['Taxa Conclusão'] = 0
                 
                 # =========================================================
-                # 2. SELEÇÃO DE CAMPANHAS (MULTI-SELECT)
+                # 2. SELEÇÃO DE CAMPANHAS (MULTI-SELECT) - CORRIGIDO!
                 # =========================================================
                 st.markdown("### 🎯 Selecione Campanhas para Comparar")
+                
+                # Inicializar session state de forma segura
+                if 'tab4_selecionadas' not in st.session_state:
+                    st.session_state.tab4_selecionadas = []
                 
                 # Opções de seleção
                 col_sel1, col_sel2, col_sel3, col_sel4 = st.columns([2, 1, 1, 1])
@@ -2180,34 +2208,33 @@ with tab4:
                 with col_sel1:
                     campanhas_lista = df_camp['Campanha'].tolist()
                     
-                    # Inicializar session state se necessário
-                    if 'tab4_campanhas_select' not in st.session_state:
-                        st.session_state.tab4_campanhas_select = []
-                    
                     campanhas_selecionadas = st.multiselect(
                         "Escolha as campanhas:",
                         options=campanhas_lista,
-                        default=st.session_state.tab4_campanhas_select,
+                        default=st.session_state.tab4_selecionadas,
                         placeholder="Clique para selecionar campanhas...",
-                        key="tab4_campanhas_select"
+                        key="tab4_multiselect"
                     )
+                    
+                    # Atualizar session state
+                    st.session_state.tab4_selecionadas = campanhas_selecionadas
                 
                 with col_sel2:
                     if st.button("🏆 Top 5 (volume)", use_container_width=True):
                         top5 = df_camp.nlargest(5, 'Total Demandas')['Campanha'].tolist()
-                        st.session_state.tab4_campanhas_select = top5
+                        st.session_state.tab4_selecionadas = top5
                         st.rerun()
                 
                 with col_sel3:
                     if st.button("✅ Top 5 (eficácia)", use_container_width=True):
                         if 'Taxa Conclusão' in df_camp.columns:
                             top5 = df_camp.nlargest(5, 'Taxa Conclusão')['Campanha'].tolist()
-                            st.session_state.tab4_campanhas_select = top5
+                            st.session_state.tab4_selecionadas = top5
                             st.rerun()
                 
                 with col_sel4:
                     if st.button("🧹 Limpar tudo", use_container_width=True):
-                        st.session_state.tab4_campanhas_select = []
+                        st.session_state.tab4_selecionadas = []
                         st.rerun()
                 
                 st.divider()
@@ -2215,6 +2242,9 @@ with tab4:
                 # =========================================================
                 # 3. VISÃO CONDICIONAL: COMPARATIVO vs CATÁLOGO
                 # =========================================================
+                
+                # Usar session_state para as seleções
+                campanhas_selecionadas = st.session_state.tab4_selecionadas
                 
                 # Se 2 ou mais campanhas selecionadas -> MODO COMPARATIVO
                 if len(campanhas_selecionadas) >= 2:
@@ -2418,7 +2448,7 @@ with tab4:
                     
                     with col_exp2:
                         if st.button("🔍 Ver catálogo completo", use_container_width=True):
-                            st.session_state.tab4_campanhas_select = []
+                            st.session_state.tab4_selecionadas = []
                             st.rerun()
                 
                 # Se 0 ou 1 campanha selecionada -> MODO CATÁLOGO
