@@ -462,10 +462,11 @@ st.info(f"📋 **Colunas:** {', '.join(df.columns.tolist()[:5])}{'...' if len(df
 # =========================================================
 # TABS
 # =========================================================
-tab1, tab2, tab3 = st.tabs([
+tab1, tab2, tab3, tab4 = st.tabs([
     "📈 Análise Estratégica",
     "🎯 KPIs COCRED",
-    "📋 Explorador de Dados"
+    "📋 Explorador de Dados",
+    "📊 Análise Comparativa de Campanhas"  # NOVA TAB
 ])
 
 # =========================================================
@@ -2048,7 +2049,408 @@ with tab3:
             )
     else:
         st.warning("⚠️ Nenhum registro encontrado com os filtros e pesquisa atuais.")
-
+# =========================================================
+# TAB 4: ANÁLISE COMPARATIVA DE CAMPANHAS
+# =========================================================
+with tab4:
+    st.markdown("## 📊 Análise Comparativa de Campanhas")
+    
+    # Configurações de template para Plotly
+    is_dark = st.get_option('theme.base') == 'dark'
+    plotly_template = 'plotly_dark' if is_dark else 'plotly_white'
+    text_color = 'white' if is_dark else 'black'
+    
+    # =========================================================
+    # 1. PREPARAR DADOS DE CAMPANHAS
+    # =========================================================
+    # Identificar coluna de campanha
+    coluna_campanha = None
+    for col in df.columns:
+        if 'campanha' in col.lower():
+            coluna_campanha = col
+            break
+    
+    if coluna_campanha:
+        # Criar DataFrame agregado por campanha
+        with st.spinner("🔄 Agregando dados por campanha..."):
+            # Filtrar apenas linhas com campanha válida
+            df_camp_valid = df[df[coluna_campanha].notna() & (df[coluna_campanha] != '')]
+            
+            if not df_camp_valid.empty:
+                df_camp = df_camp_valid.groupby(coluna_campanha).agg({
+                    'ID': 'count',
+                    'Status': lambda x: list(x.unique()),
+                    'Prioridade': lambda x: list(x.unique()),
+                    'Data de Solicitação': ['min', 'max'],
+                    'Data de Entrega': lambda x: x.count(),
+                    'Solicitante': lambda x: list(x.unique())[:3],
+                    'Tipo': lambda x: list(x.unique()),
+                    'Produção': lambda x: list(x.unique())
+                }).reset_index()
+                
+                # Achatar colunas
+                df_camp.columns = [
+                    'Campanha', 'Total Demandas', 'Status', 'Prioridades',
+                    'Data Início', 'Data Fim', 'Total Entregues',
+                    'Principais Solicitantes', 'Tipos', 'Produção'
+                ]
+                
+                # Calcular métricas adicionais
+                df_camp['Taxa Conclusão'] = (df_camp['Total Entregues'] / df_camp['Total Demandas'] * 100).round(1)
+                df_camp['Duração (dias)'] = (df_camp['Data Fim'] - df_camp['Data Início']).dt.days
+                df_camp['Duração (dias)'] = df_camp['Duração (dias)'].clip(lower=0)  # Evitar valores negativos
+                
+                # =========================================================
+                # 2. SELEÇÃO DE CAMPANHAS (MULTI-SELECT)
+                # =========================================================
+                st.markdown("### 🎯 Selecione Campanhas para Comparar")
+                
+                # Opções de seleção
+                col_sel1, col_sel2, col_sel3, col_sel4 = st.columns([2, 1, 1, 1])
+                
+                with col_sel1:
+                    campanhas_lista = df_camp['Campanha'].tolist()
+                    
+                    # Inicializar session state se necessário
+                    if 'tab4_campanhas_select' not in st.session_state:
+                        st.session_state.tab4_campanhas_select = []
+                    
+                    campanhas_selecionadas = st.multiselect(
+                        "Escolha as campanhas:",
+                        options=campanhas_lista,
+                        default=st.session_state.tab4_campanhas_select,
+                        placeholder="Clique para selecionar campanhas...",
+                        key="tab4_campanhas_select"
+                    )
+                
+                with col_sel2:
+                    if st.button("🏆 Top 5 (volume)", use_container_width=True):
+                        top5 = df_camp.nlargest(5, 'Total Demandas')['Campanha'].tolist()
+                        st.session_state.tab4_campanhas_select = top5
+                        st.rerun()
+                
+                with col_sel3:
+                    if st.button("✅ Top 5 (eficácia)", use_container_width=True):
+                        top5 = df_camp.nlargest(5, 'Taxa Conclusão')['Campanha'].tolist()
+                        st.session_state.tab4_campanhas_select = top5
+                        st.rerun()
+                
+                with col_sel4:
+                    if st.button("🧹 Limpar tudo", use_container_width=True):
+                        st.session_state.tab4_campanhas_select = []
+                        st.rerun()
+                
+                st.divider()
+                
+                # =========================================================
+                # 3. VISÃO CONDICIONAL: COMPARATIVO vs CATÁLOGO
+                # =========================================================
+                
+                # Se 2 ou mais campanhas selecionadas -> MODO COMPARATIVO
+                if len(campanhas_selecionadas) >= 2:
+                    st.markdown(f"## 📈 Comparativo: {len(campanhas_selecionadas)} campanhas")
+                    
+                    # Filtrar dados das campanhas selecionadas
+                    df_compare = df_camp[df_camp['Campanha'].isin(campanhas_selecionadas)].copy()
+                    
+                    # ========== CARDS DE MÉTRICAS ==========
+                    col_comp1, col_comp2, col_comp3, col_comp4 = st.columns(4)
+                    
+                    with col_comp1:
+                        campanha_mais_demandas = df_compare.loc[df_compare['Total Demandas'].idxmax()]
+                        st.markdown(f"""
+                        <div class="metric-card-cocred">
+                            <p style="font-size:12px; margin:0;">🏆 MAIS DEMANDAS</p>
+                            <p style="font-size:18px; font-weight:bold; margin:5px 0;">{campanha_mais_demandas['Campanha'][:25]}</p>
+                            <p style="font-size:28px; font-weight:bold; margin:0;">{campanha_mais_demandas['Total Demandas']}</p>
+                            <p style="font-size:11px; margin:5px 0 0 0;">demandas</p>
+                        </div>
+                        """, unsafe_allow_html=True)
+                    
+                    with col_comp2:
+                        campanha_mais_eficiente = df_compare.loc[df_compare['Taxa Conclusão'].idxmax()]
+                        st.markdown(f"""
+                        <div class="metric-card-cocred" style="background: linear-gradient(135deg, #28A745 0%, #1E7E34 100%);">
+                            <p style="font-size:12px; margin:0;">✅ MAIS EFICIENTE</p>
+                            <p style="font-size:18px; font-weight:bold; margin:5px 0;">{campanha_mais_eficiente['Campanha'][:25]}</p>
+                            <p style="font-size:28px; font-weight:bold; margin:0;">{campanha_mais_eficiente['Taxa Conclusão']}%</p>
+                            <p style="font-size:11px; margin:5px 0 0 0;">taxa conclusão</p>
+                        </div>
+                        """, unsafe_allow_html=True)
+                    
+                    with col_comp3:
+                        campanha_mais_longa = df_compare.loc[df_compare['Duração (dias)'].idxmax()]
+                        st.markdown(f"""
+                        <div class="metric-card-cocred" style="background: linear-gradient(135deg, #FF6600 0%, #CC5200 100%);">
+                            <p style="font-size:12px; margin:0;">⏱️ MAIS LONGA</p>
+                            <p style="font-size:18px; font-weight:bold; margin:5px 0;">{campanha_mais_longa['Campanha'][:25]}</p>
+                            <p style="font-size:28px; font-weight:bold; margin:0;">{campanha_mais_longa['Duração (dias)']} dias</p>
+                            <p style="font-size:11px; margin:5px 0 0 0;">duração total</p>
+                        </div>
+                        """, unsafe_allow_html=True)
+                    
+                    with col_comp4:
+                        campanha_mais_recente = df_compare.loc[df_compare['Data Início'].idxmax()]
+                        st.markdown(f"""
+                        <div class="metric-card-cocred" style="background: linear-gradient(135deg, #00A3E0 0%, #0077A3 100%);">
+                            <p style="font-size:12px; margin:0;">🆕 MAIS RECENTE</p>
+                            <p style="font-size:18px; font-weight:bold; margin:5px 0;">{campanha_mais_recente['Campanha'][:25]}</p>
+                            <p style="font-size:20px; font-weight:bold; margin:0;">{campanha_mais_recente['Data Início'].strftime('%d/%m/%Y')}</p>
+                            <p style="font-size:11px; margin:5px 0 0 0;">data início</p>
+                        </div>
+                        """, unsafe_allow_html=True)
+                    
+                    # ========== GRÁFICOS COMPARATIVOS ==========
+                    col_graf1, col_graf2 = st.columns(2)
+                    
+                    with col_graf1:
+                        # Gráfico de barras - Total Demandas vs Concluídas
+                        fig_comp = go.Figure()
+                        
+                        fig_comp.add_trace(go.Bar(
+                            name='Total Demandas',
+                            x=df_compare['Campanha'],
+                            y=df_compare['Total Demandas'],
+                            marker_color='#003366',
+                            text=df_compare['Total Demandas'],
+                            textposition='outside',
+                            textfont=dict(color=text_color)
+                        ))
+                        
+                        fig_comp.add_trace(go.Bar(
+                            name='Concluídas',
+                            x=df_compare['Campanha'],
+                            y=df_compare['Total Entregues'],
+                            marker_color='#28A745',
+                            text=df_compare['Total Entregues'],
+                            textposition='outside',
+                            textfont=dict(color=text_color)
+                        ))
+                        
+                        fig_comp.update_layout(
+                            title='📊 Volume de Demandas por Campanha',
+                            barmode='group',
+                            height=400,
+                            template=plotly_template,
+                            showlegend=True,
+                            font=dict(color=text_color),
+                            paper_bgcolor='rgba(0,0,0,0)',
+                            plot_bgcolor='rgba(0,0,0,0)',
+                            xaxis_tickangle=-45
+                        )
+                        st.plotly_chart(fig_comp, use_container_width=True, config={'displayModeBar': False})
+                    
+                    with col_graf2:
+                        # Gráfico de barras - Taxa de Conclusão
+                        fig_taxa = go.Figure()
+                        
+                        # Ordenar por taxa
+                        df_taxa = df_compare.sort_values('Taxa Conclusão', ascending=True)
+                        
+                        fig_taxa.add_trace(go.Bar(
+                            x=df_taxa['Taxa Conclusão'],
+                            y=df_taxa['Campanha'],
+                            orientation='h',
+                            marker_color='#FF6600',
+                            text=df_taxa['Taxa Conclusão'].astype(str) + '%',
+                            textposition='outside',
+                            textfont=dict(color=text_color)
+                        ))
+                        
+                        fig_taxa.update_layout(
+                            title='📈 Taxa de Conclusão por Campanha',
+                            height=400,
+                            template=plotly_template,
+                            showlegend=False,
+                            font=dict(color=text_color),
+                            paper_bgcolor='rgba(0,0,0,0)',
+                            plot_bgcolor='rgba(0,0,0,0)',
+                            xaxis_title="Taxa de Conclusão (%)",
+                            yaxis_title=""
+                        )
+                        st.plotly_chart(fig_taxa, use_container_width=True, config={'displayModeBar': False})
+                    
+                    # ========== TABELA COMPARATIVA ==========
+                    st.markdown("### 📋 Tabela Comparativa")
+                    
+                    # Preparar tabela para exibição
+                    df_compare_display = df_compare[[
+                        'Campanha', 'Total Demandas', 'Total Entregues', 
+                        'Taxa Conclusão', 'Duração (dias)', 'Data Início', 'Data Fim'
+                    ]].copy()
+                    
+                    # Formatar datas
+                    df_compare_display['Data Início'] = df_compare_display['Data Início'].dt.strftime('%d/%m/%Y')
+                    df_compare_display['Data Fim'] = df_compare_display['Data Fim'].dt.strftime('%d/%m/%Y')
+                    
+                    st.dataframe(
+                        df_compare_display,
+                        use_container_width=True,
+                        hide_index=True,
+                        column_config={
+                            "Campanha": "📌 Campanha",
+                            "Total Demandas": st.column_config.NumberColumn("📊 Total", format="%d"),
+                            "Total Entregues": st.column_config.NumberColumn("✅ Entregues", format="%d"),
+                            "Taxa Conclusão": st.column_config.ProgressColumn(
+                                "🎯 Taxa",
+                                format="%.1f%%",
+                                min_value=0,
+                                max_value=100
+                            ),
+                            "Duração (dias)": "⏱️ Duração",
+                            "Data Início": "📅 Início",
+                            "Data Fim": "📅 Fim"
+                        }
+                    )
+                    
+                    # ========== EXPORTAÇÃO DO COMPARATIVO ==========
+                    col_exp1, col_exp2 = st.columns(2)
+                    
+                    with col_exp1:
+                        csv_compare = df_compare_display.to_csv(index=False, encoding='utf-8-sig')
+                        st.download_button(
+                            "📥 Exportar Comparativo CSV",
+                            csv_compare,
+                            f"comparativo_campanhas_{datetime.now().strftime('%Y%m%d_%H%M')}.csv",
+                            use_container_width=True
+                        )
+                    
+                    with col_exp2:
+                        if st.button("🔍 Ver catálogo completo", use_container_width=True):
+                            st.session_state.tab4_campanhas_select = []
+                            st.rerun()
+                
+                # Se 0 ou 1 campanha selecionada -> MODO CATÁLOGO
+                else:
+                    st.markdown("## 📋 Catálogo Completo de Campanhas")
+                    
+                    # ========== FILTROS RÁPIDOS ==========
+                    with st.expander("🔍 Filtrar Campanhas", expanded=True):
+                        col_f1, col_f2, col_f3 = st.columns(3)
+                        
+                        with col_f1:
+                            busca_nome = st.text_input("🔎 Buscar por nome:", placeholder="Digite...", key="tab4_busca")
+                        
+                        with col_f2:
+                            periodo_opcoes = ["Todas", "Último mês", "Últimos 3 meses", "Último ano"]
+                            periodo_filtro = st.selectbox("📅 Período", periodo_opcoes, key="tab4_periodo")
+                        
+                        with col_f3:
+                            min_demandas = st.number_input("Mínimo de demandas:", min_value=0, value=0, key="tab4_min")
+                    
+                    # Aplicar filtros
+                    df_catalogo = df_camp.copy()
+                    
+                    if busca_nome:
+                        df_catalogo = df_catalogo[df_catalogo['Campanha'].str.contains(busca_nome, case=False, na=False)]
+                    
+                    if periodo_filtro != "Todas":
+                        hoje = datetime.now()
+                        if periodo_filtro == "Último mês":
+                            data_limite = hoje - timedelta(days=30)
+                        elif periodo_filtro == "Últimos 3 meses":
+                            data_limite = hoje - timedelta(days=90)
+                        else:  # Último ano
+                            data_limite = hoje - timedelta(days=365)
+                        
+                        df_catalogo = df_catalogo[df_catalogo['Data Início'] >= pd.Timestamp(data_limite)]
+                    
+                    if min_demandas > 0:
+                        df_catalogo = df_catalogo[df_catalogo['Total Demandas'] >= min_demandas]
+                    
+                    # ========== MÉTRICAS DO CATÁLOGO ==========
+                    col_cat1, col_cat2, col_cat3, col_cat4 = st.columns(4)
+                    
+                    with col_cat1:
+                        st.metric("Total Campanhas", len(df_catalogo))
+                    
+                    with col_cat2:
+                        media_demandas = df_catalogo['Total Demandas'].mean()
+                        st.metric("Média Demandas", f"{media_demandas:.1f}")
+                    
+                    with col_cat3:
+                        total_demandas_camp = df_catalogo['Total Demandas'].sum()
+                        st.metric("Demandas em Campanhas", f"{total_demandas_camp:,}")
+                    
+                    with col_cat4:
+                        media_taxa = df_catalogo['Taxa Conclusão'].mean()
+                        st.metric("Taxa Média", f"{media_taxa:.1f}%")
+                    
+                    # ========== TABELA PRINCIPAL DO CATÁLOGO ==========
+                    st.markdown("### 📋 Lista de Campanhas")
+                    
+                    # Preparar dados para exibição
+                    df_display = df_catalogo[[
+                        'Campanha', 'Total Demandas', 'Taxa Conclusão', 
+                        'Data Início', 'Data Fim', 'Duração (dias)',
+                        'Principais Solicitantes'
+                    ]].copy()
+                    
+                    # Formatar datas
+                    df_display['Data Início'] = df_display['Data Início'].dt.strftime('%d/%m/%Y')
+                    df_display['Data Fim'] = df_display['Data Fim'].dt.strftime('%d/%m/%Y')
+                    
+                    # Formatar solicitantes
+                    df_display['Principais Solicitantes'] = df_display['Principais Solicitantes'].apply(
+                        lambda x: ', '.join(x) if isinstance(x, list) else str(x)
+                    )
+                    
+                    # Calcular altura da tabela
+                    altura_tabela = calcular_altura_tabela(len(df_display), len(df_display.columns))
+                    
+                    st.dataframe(
+                        df_display,
+                        use_container_width=True,
+                        height=min(altura_tabela, 600),
+                        column_config={
+                            "Campanha": st.column_config.TextColumn("📌 Campanha", width="large"),
+                            "Total Demandas": st.column_config.NumberColumn("📊 Demandas", format="%d"),
+                            "Taxa Conclusão": st.column_config.NumberColumn("✅ Taxa", format="%.1f%%"),
+                            "Data Início": "📅 Início",
+                            "Data Fim": "📅 Fim",
+                            "Duração (dias)": "⏱️ Duração",
+                            "Principais Solicitantes": st.column_config.TextColumn("👥 Solicitantes", width="medium")
+                        }
+                    )
+                    
+                    # ========== EXPORTAÇÃO DO CATÁLOGO ==========
+                    st.divider()
+                    col_exp_cat1, col_exp_cat2, col_exp_cat3 = st.columns(3)
+                    
+                    with col_exp_cat1:
+                        csv_catalogo = df_display.to_csv(index=False, encoding='utf-8-sig')
+                        st.download_button(
+                            "📥 Exportar Catálogo CSV",
+                            csv_catalogo,
+                            f"catalogo_campanhas_{datetime.now().strftime('%Y%m%d')}.csv",
+                            use_container_width=True
+                        )
+                    
+                    with col_exp_cat2:
+                        # Se uma campanha específica estiver selecionada
+                        if len(campanhas_selecionadas) == 1:
+                            campanha_detalhe = campanhas_selecionadas[0]
+                            st.info(f"ℹ️ Detalhando: {campanha_detalhe[:30]}")
+                            
+                            # Botão para ver detalhes
+                            if st.button("🔍 Ver demandas desta campanha", use_container_width=True):
+                                st.session_state.campanha_selecionada = campanha_detalhe
+                                st.switch_page(tab2)  # Vai para tab2 com a campanha selecionada
+                    
+                    with col_exp_cat3:
+                        if st.button("🔄 Limpar filtros", use_container_width=True):
+                            st.session_state.tab4_busca = ""
+                            st.session_state.tab4_periodo = "Todas"
+                            st.session_state.tab4_min = 0
+                            st.rerun()
+            
+            else:
+                st.warning("⚠️ Nenhuma campanha válida encontrada nos dados")
+    else:
+        st.warning("⚠️ Coluna de campanha não encontrada no DataFrame")
+        
+        if st.session_state.get('debug_mode', False):
+            st.write("📋 Colunas disponíveis:", df.columns.tolist())
 # =========================================================
 # EXPORTAÇÃO (COMPLETA EM MÚLTIPLOS FORMATOS)
 # =========================================================
