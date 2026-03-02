@@ -2050,7 +2050,7 @@ with tab3:
     else:
         st.warning("⚠️ Nenhum registro encontrado com os filtros e pesquisa atuais.")
 # =========================================================
-# TAB 4: ANÁLISE DE CAMPANHAS (VERSÃO SIMPLIFICADA)
+# TAB 4: ANÁLISE DE CAMPANHAS (VERSÃO FINAL)
 # =========================================================
 with tab4:
     st.markdown("## 📋 Catálogo de Campanhas")
@@ -2518,22 +2518,70 @@ with tab4:
         # Ordenar por total de demandas
         df_camp = df_camp.sort_values('Total Demandas', ascending=False).reset_index(drop=True)
     
-    st.divider()
+    # =========================================================
+    # SELETOR DE CAMPANHA (NOVO!)
+    # =========================================================
+    st.markdown("### 🎯 Selecionar Campanha")
+    
+    col_sel1, col_sel2 = st.columns([3, 1])
+    
+    with col_sel1:
+        # Lista de campanhas (incluindo opção "Todas")
+        campanhas_lista = ['Todas'] + df_camp['Campanha'].tolist()
+        campanha_selecionada = st.selectbox(
+            "Escolha uma campanha para ver detalhes:",
+            options=campanhas_lista,
+            index=0,
+            key="seletor_campanha"
+        )
+    
+    with col_sel2:
+        st.markdown("<br>", unsafe_allow_html=True)
+        if st.button("🔄 Limpar seleção", use_container_width=True):
+            st.session_state.seletor_campanha = 'Todas'
+            st.rerun()
     
     # =========================================================
-    # TABELA EXPANSÍVEL DE CAMPANHAS
+    # MÉTRICAS DA CAMPANHA SELECIONADA (se não for "Todas")
     # =========================================================
-    st.markdown("### 📋 Todas as Campanhas")
+    if campanha_selecionada != 'Todas':
+        # Filtrar dados da campanha
+        df_camp_sel = df_camp[df_camp['Campanha'] == campanha_selecionada].iloc[0]
+        
+        # Mostrar métricas da campanha
+        st.markdown(f"### 📊 Detalhes: {campanha_selecionada}")
+        col_m1, col_m2, col_m3 = st.columns(3)
+        
+        with col_m1:
+            st.metric("Total Demandas", int(df_camp_sel['Total Demandas']))
+        with col_m2:
+            st.metric("Taxa de Conclusão", f"{df_camp_sel['Taxa Conclusão']}%")
+        with col_m3:
+            st.metric("Período", df_camp_sel['Período'])
+        
+        st.divider()
+    
+    # =========================================================
+    # TABELA EXPANSÍVEL DE CAMPANHAS (filtrada pela seleção)
+    # =========================================================
+    st.markdown("### 📋 Lista de Campanhas")
+    
+    # Filtrar tabela se uma campanha específica foi selecionada
+    if campanha_selecionada != 'Todas':
+        df_tabela_exibicao = df_camp[df_camp['Campanha'] == campanha_selecionada].copy()
+        st.info(f"📌 Mostrando apenas: {campanha_selecionada}")
+    else:
+        df_tabela_exibicao = df_camp.copy()
     
     # Preparar dados para tabela
-    colunas_tabela = ['Campanha', 'Período', 'Total Demandas', 'Total Entregues', 'Taxa Conclusão']
+    colunas_tabela = ['Campanha', 'Período', 'Total Demandas', 'Taxa Conclusão']
     
-    if 'Tipos' in df_camp.columns:
+    if 'Tipos' in df_tabela_exibicao.columns:
         colunas_tabela.append('Tipos')
-    if 'Solicitantes' in df_camp.columns:
+    if 'Solicitantes' in df_tabela_exibicao.columns:
         colunas_tabela.append('Solicitantes')
     
-    df_tabela = df_camp[colunas_tabela].copy()
+    df_tabela = df_tabela_exibicao[colunas_tabela].copy()
     
     # Formatar colunas
     if 'Tipos' in df_tabela.columns:
@@ -2541,22 +2589,23 @@ with tab4:
     if 'Solicitantes' in df_tabela.columns:
         df_tabela['Solicitantes'] = df_tabela['Solicitantes'].apply(lambda x: ', '.join(x) if isinstance(x, list) else '')
     
-    # Mostrar métricas resumidas (SEM taxa média)
-    col_res1, col_res2, col_res3 = st.columns(3)
-    with col_res1:
-        st.metric("Total Campanhas", len(df_tabela))
-    with col_res2:
-        st.metric("Total Demandas", int(df_tabela['Total Demandas'].sum()))
-    with col_res3:
-        st.metric("Total Entregues", int(df_tabela['Total Entregues'].sum()))
-    
-    st.divider()
+    # Mostrar métricas resumidas (apenas quando mostra todas)
+    if campanha_selecionada == 'Todas':
+        col_res1, col_res2, col_res3 = st.columns(3)
+        with col_res1:
+            st.metric("Total Campanhas", len(df_tabela))
+        with col_res2:
+            st.metric("Total Demandas", int(df_tabela['Total Demandas'].sum()))
+        with col_res3:
+            st.metric("Média Taxa", f"{df_tabela['Taxa Conclusão'].mean():.1f}%")
+        
+        st.divider()
     
     # Tabela interativa
     for idx, row in df_tabela.iterrows():
         with st.container():
             # Linha da campanha
-            cols = st.columns([3, 2, 1, 1, 1, 2])
+            cols = st.columns([3, 2, 1, 1, 2])
             
             with cols[0]:
                 st.markdown(f"**{row['Campanha']}**")
@@ -2565,10 +2614,8 @@ with tab4:
             with cols[2]:
                 st.markdown(f"**{int(row['Total Demandas'])}**")
             with cols[3]:
-                st.markdown(f"**{int(row['Total Entregues'])}**")
-            with cols[4]:
                 st.markdown(f"**{row['Taxa Conclusão']}%**")
-            with cols[5]:
+            with cols[4]:
                 if 'Solicitantes' in row:
                     st.markdown(f"_{row['Solicitantes']}_")
             
