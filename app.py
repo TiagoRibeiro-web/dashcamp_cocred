@@ -2649,12 +2649,11 @@ with tab4:
                 
                 if colunas_display:
                     st.dataframe(
-                        demandas_campanha[colunas_display].head(10),
+                        demandas_campanha[colunas_display],
                         use_container_width=True,
+                        height=min(500, len(demandas_campanha) * 35 + 50),  # Altura dinâmica com limite
                         hide_index=True
                     )
-                    if len(demandas_campanha) > 10:
-                        st.caption(f"Mostrando 10 de {len(demandas_campanha)} demandas")
             
             st.divider()
 # =========================================================
