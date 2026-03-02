@@ -2596,8 +2596,8 @@ with tab4:
             st.metric("Total Campanhas", len(df_tabela))
         with col_res2:
             st.metric("Total Demandas", int(df_tabela['Total Demandas'].sum()))
-        with col_res3:
-            st.metric("Média Taxa", f"{df_tabela['Taxa Conclusão'].mean():.1f}%")
+        # with col_res3:
+        #     st.metric("Média Taxa", f"{df_tabela['Taxa Conclusão'].mean():.1f}%")
         
         st.divider()
     
