@@ -2049,7 +2049,567 @@ with tab3:
             )
     else:
         st.warning("⚠️ Nenhum registro encontrado com os filtros e pesquisa atuais.")
-
+# =========================================================
+# TAB 4: ANÁLISE DE CAMPANHAS (VERSÃO SIMPLIFICADA)
+# =========================================================
+with tab4:
+    st.markdown("## 📋 Catálogo de Campanhas")
+    
+    # Identificar coluna de campanha
+    coluna_campanha = None
+    for col in df.columns:
+        if 'campanha' in col.lower():
+            coluna_campanha = col
+            break
+    
+    if not coluna_campanha:
+        st.warning("⚠️ Coluna de campanha não encontrada no DataFrame")
+        if st.session_state.get('debug_mode', False):
+            st.write("📋 Colunas disponíveis:", df.columns.tolist())
+        st.stop()
+    
+    # =========================================================
+    # FILTROS AVANÇADOS (CÓPIA EXATA DA TAB 2)
+    # =========================================================
+    with st.container():
+        st.markdown("##### 🔍 Filtros Avançados")
+        
+        # Dicionário para armazenar filtros ativos
+        filtros_ativos_tab4 = {}
+        
+        # Primeira linha de filtros (categóricos)
+        col_f1, col_f2, col_f3 = st.columns(3)
+        
+        with col_f1:
+            if 'Status' in df.columns:
+                status_opcoes = ['Todos'] + sorted(df['Status'].dropna().unique().tolist())
+                status_selecionado = st.selectbox("📌 Status", status_opcoes, key="tab4_status")
+                if status_selecionado != 'Todos':
+                    filtros_ativos_tab4['Status'] = status_selecionado
+        
+        with col_f2:
+            if 'Prioridade' in df.columns:
+                prioridade_opcoes = ['Todos'] + sorted(df['Prioridade'].dropna().unique().tolist())
+                prioridade_selecionada = st.selectbox("⚡ Prioridade", prioridade_opcoes, key="tab4_prioridade")
+                if prioridade_selecionada != 'Todos':
+                    filtros_ativos_tab4['Prioridade'] = prioridade_selecionada
+        
+        with col_f3:
+            if 'Produção' in df.columns:
+                producao_opcoes = ['Todos'] + sorted(df['Produção'].dropna().unique().tolist())
+                producao_selecionada = st.selectbox("🏭 Produção", producao_opcoes, key="tab4_producao")
+                if producao_selecionada != 'Todos':
+                    filtros_ativos_tab4['Produção'] = producao_selecionada
+        
+        # Segunda linha de filtros (datas) - 4 COLUNAS!
+        col_f4, col_f5, col_f6, col_f7 = st.columns([2, 2, 2, 1])
+        
+        with col_f4:
+            if 'Data de Solicitação' in df.columns:
+                periodo_data = st.selectbox(
+                    "📅 Data de Solicitação", 
+                    ["Todos", "Hoje", "Esta semana", "Este mês", "Quinzena", "Últimos 30 dias", "Personalizado"],
+                    key="tab4_periodo_data"
+                )
+                
+                hoje = datetime.now().date()
+                
+                if periodo_data == "Hoje":
+                    filtros_ativos_tab4['data_inicio'] = hoje
+                    filtros_ativos_tab4['data_fim'] = hoje
+                    filtros_ativos_tab4['tem_filtro_data'] = True
+                elif periodo_data == "Esta semana":
+                    inicio_semana = hoje - timedelta(days=hoje.weekday())
+                    filtros_ativos_tab4['data_inicio'] = inicio_semana
+                    filtros_ativos_tab4['data_fim'] = hoje
+                    filtros_ativos_tab4['tem_filtro_data'] = True
+                elif periodo_data == "Este mês":
+                    inicio_mes = hoje.replace(day=1)
+                    filtros_ativos_tab4['data_inicio'] = inicio_mes
+                    filtros_ativos_tab4['data_fim'] = hoje
+                    filtros_ativos_tab4['tem_filtro_data'] = True
+                elif periodo_data == "Quinzena":
+                    quinzena_opcao = st.radio(
+                        "Escolha:",
+                        ["1ª quinzena (1-15)", "2ª quinzena (16-31)"],
+                        horizontal=True,
+                        key="tab4_data_quinzena_opcao",
+                        label_visibility="collapsed"
+                    )
+                    
+                    ano_atual = hoje.year
+                    mes_atual = hoje.month
+                    
+                    if quinzena_opcao == "1ª quinzena (1-15)":
+                        data_inicio_quinzena = date(ano_atual, mes_atual, 1)
+                        data_fim_quinzena = date(ano_atual, mes_atual, 15)
+                    else:
+                        ultimo_dia = (date(ano_atual, mes_atual, 1) + timedelta(days=32)).replace(day=1) - timedelta(days=1)
+                        data_inicio_quinzena = date(ano_atual, mes_atual, 16)
+                        data_fim_quinzena = ultimo_dia
+                    
+                    filtros_ativos_tab4['data_inicio'] = data_inicio_quinzena
+                    filtros_ativos_tab4['data_fim'] = data_fim_quinzena
+                    filtros_ativos_tab4['tem_filtro_data'] = True
+                    
+                    st.caption(f"📅 {data_inicio_quinzena.strftime('%d/%m')} a {data_fim_quinzena.strftime('%d/%m')}")
+                    
+                elif periodo_data == "Últimos 30 dias":
+                    inicio_30d = hoje - timedelta(days=30)
+                    filtros_ativos_tab4['data_inicio'] = inicio_30d
+                    filtros_ativos_tab4['data_fim'] = hoje
+                    filtros_ativos_tab4['tem_filtro_data'] = True
+                elif periodo_data == "Personalizado":
+                    datas_validas = df['Data de Solicitação'].dropna()
+                    if not datas_validas.empty:
+                        data_min = datas_validas.min().date()
+                        data_max = datas_validas.max().date()
+                        
+                        col_d1, col_d2 = st.columns(2)
+                        with col_d1:
+                            data_ini = st.date_input("De", data_min, key="tab4_data_ini")
+                        with col_d2:
+                            data_fim = st.date_input("Até", data_max, key="tab4_data_fim")
+                        
+                        filtros_ativos_tab4['data_inicio'] = data_ini
+                        filtros_ativos_tab4['data_fim'] = data_fim
+                        filtros_ativos_tab4['tem_filtro_data'] = True
+        
+        with col_f5:
+            # Procurar por colunas de deadline
+            coluna_deadline = None
+            for col in df.columns:
+                if 'deadline' in col.lower() or 'prazo' in col.lower():
+                    coluna_deadline = col
+                    break
+            
+            if coluna_deadline is None and 'Deadline' in df.columns:
+                coluna_deadline = 'Deadline'
+            
+            if coluna_deadline:
+                periodo_deadline = st.selectbox(
+                    "⏰ Deadline", 
+                    ["Todos", "Hoje", "Esta semana", "Este mês", "Quinzena", "Próximos 7 dias", "Próximos 30 dias", "Atrasados", "Personalizado"],
+                    key="tab4_periodo_deadline"
+                )
+                
+                hoje = datetime.now().date()
+                
+                if periodo_deadline != "Todos":
+                    datas_validas_deadline = df[coluna_deadline].dropna()
+                    if not datas_validas_deadline.empty:
+                        data_min_deadline = datas_validas_deadline.min().date()
+                        data_max_deadline = datas_validas_deadline.max().date()
+                        
+                        if periodo_deadline == "Hoje":
+                            filtros_ativos_tab4['deadline_inicio'] = hoje
+                            filtros_ativos_tab4['deadline_fim'] = hoje
+                            filtros_ativos_tab4['tem_filtro_deadline'] = True
+                            filtros_ativos_tab4['coluna_deadline'] = coluna_deadline
+                        elif periodo_deadline == "Esta semana":
+                            inicio_semana = hoje - timedelta(days=hoje.weekday())
+                            fim_semana = inicio_semana + timedelta(days=6)
+                            filtros_ativos_tab4['deadline_inicio'] = inicio_semana
+                            filtros_ativos_tab4['deadline_fim'] = fim_semana
+                            filtros_ativos_tab4['tem_filtro_deadline'] = True
+                            filtros_ativos_tab4['coluna_deadline'] = coluna_deadline
+                        elif periodo_deadline == "Este mês":
+                            inicio_mes = hoje.replace(day=1)
+                            ultimo_dia = (inicio_mes + timedelta(days=32)).replace(day=1) - timedelta(days=1)
+                            filtros_ativos_tab4['deadline_inicio'] = inicio_mes
+                            filtros_ativos_tab4['deadline_fim'] = ultimo_dia
+                            filtros_ativos_tab4['tem_filtro_deadline'] = True
+                            filtros_ativos_tab4['coluna_deadline'] = coluna_deadline
+                        elif periodo_deadline == "Quinzena":
+                            quinzena_opcao = st.radio(
+                                "Escolha:",
+                                ["1ª quinzena (1-15)", "2ª quinzena (16-31)"],
+                                horizontal=True,
+                                key="tab4_deadline_quinzena_opcao",
+                                label_visibility="collapsed"
+                            )
+                            
+                            ano_atual = hoje.year
+                            mes_atual = hoje.month
+                            
+                            if quinzena_opcao == "1ª quinzena (1-15)":
+                                data_inicio_quinzena = date(ano_atual, mes_atual, 1)
+                                data_fim_quinzena = date(ano_atual, mes_atual, 15)
+                            else:
+                                ultimo_dia = (date(ano_atual, mes_atual, 1) + timedelta(days=32)).replace(day=1) - timedelta(days=1)
+                                data_inicio_quinzena = date(ano_atual, mes_atual, 16)
+                                data_fim_quinzena = ultimo_dia
+                            
+                            filtros_ativos_tab4['deadline_inicio'] = data_inicio_quinzena
+                            filtros_ativos_tab4['deadline_fim'] = data_fim_quinzena
+                            filtros_ativos_tab4['tem_filtro_deadline'] = True
+                            filtros_ativos_tab4['coluna_deadline'] = coluna_deadline
+                            
+                            st.caption(f"📅 {data_inicio_quinzena.strftime('%d/%m')} a {data_fim_quinzena.strftime('%d/%m')}")
+                            
+                        elif periodo_deadline == "Próximos 7 dias":
+                            filtros_ativos_tab4['deadline_inicio'] = hoje
+                            filtros_ativos_tab4['deadline_fim'] = hoje + timedelta(days=7)
+                            filtros_ativos_tab4['tem_filtro_deadline'] = True
+                            filtros_ativos_tab4['coluna_deadline'] = coluna_deadline
+                        elif periodo_deadline == "Próximos 30 dias":
+                            filtros_ativos_tab4['deadline_inicio'] = hoje
+                            filtros_ativos_tab4['deadline_fim'] = hoje + timedelta(days=30)
+                            filtros_ativos_tab4['tem_filtro_deadline'] = True
+                            filtros_ativos_tab4['coluna_deadline'] = coluna_deadline
+                        elif periodo_deadline == "Atrasados":
+                            filtros_ativos_tab4['deadline_inicio'] = data_min_deadline
+                            filtros_ativos_tab4['deadline_fim'] = hoje - timedelta(days=1)
+                            filtros_ativos_tab4['tem_filtro_deadline'] = True
+                            filtros_ativos_tab4['coluna_deadline'] = coluna_deadline
+                        elif periodo_deadline == "Personalizado":
+                            col_dd1, col_dd2 = st.columns(2)
+                            with col_dd1:
+                                data_ini_deadline = st.date_input("De", data_min_deadline, key="tab4_deadline_ini")
+                            with col_dd2:
+                                data_fim_deadline = st.date_input("Até", data_max_deadline, key="tab4_deadline_fim")
+                            filtros_ativos_tab4['deadline_inicio'] = data_ini_deadline
+                            filtros_ativos_tab4['deadline_fim'] = data_fim_deadline
+                            filtros_ativos_tab4['tem_filtro_deadline'] = True
+                            filtros_ativos_tab4['coluna_deadline'] = coluna_deadline
+            else:
+                st.selectbox("⏰ Deadline", ["Indisponível"], disabled=True, key="tab4_deadline_disabled")
+        
+        with col_f6:
+            # Procurar por colunas de data de entrega
+            coluna_entrega = None
+            for col in df.columns:
+                if 'entrega' in col.lower() or 'data entrega' in col.lower() or 'dt entrega' in col.lower():
+                    coluna_entrega = col
+                    break
+            
+            if coluna_entrega is None and 'Data de Entrega' in df.columns:
+                coluna_entrega = 'Data de Entrega'
+            
+            if coluna_entrega:
+                periodo_entrega = st.selectbox(
+                    "📦 Data de Entrega", 
+                    ["Todos", "Hoje", "Esta semana", "Este mês", "Quinzena", "Últimos 7 dias", "Últimos 30 dias", "Personalizado"],
+                    key="tab4_periodo_entrega"
+                )
+                
+                hoje = datetime.now().date()
+                
+                if periodo_entrega != "Todos":
+                    datas_validas_entrega = df[coluna_entrega].dropna()
+                    if not datas_validas_entrega.empty:
+                        data_min_entrega = datas_validas_entrega.min().date()
+                        data_max_entrega = datas_validas_entrega.max().date()
+                        
+                        if periodo_entrega == "Hoje":
+                            filtros_ativos_tab4['entrega_inicio'] = hoje
+                            filtros_ativos_tab4['entrega_fim'] = hoje
+                            filtros_ativos_tab4['tem_filtro_entrega'] = True
+                            filtros_ativos_tab4['coluna_entrega'] = coluna_entrega
+                        elif periodo_entrega == "Esta semana":
+                            inicio_semana = hoje - timedelta(days=hoje.weekday())
+                            fim_semana = inicio_semana + timedelta(days=6)
+                            filtros_ativos_tab4['entrega_inicio'] = inicio_semana
+                            filtros_ativos_tab4['entrega_fim'] = fim_semana
+                            filtros_ativos_tab4['tem_filtro_entrega'] = True
+                            filtros_ativos_tab4['coluna_entrega'] = coluna_entrega
+                        elif periodo_entrega == "Este mês":
+                            inicio_mes = hoje.replace(day=1)
+                            ultimo_dia = (inicio_mes + timedelta(days=32)).replace(day=1) - timedelta(days=1)
+                            filtros_ativos_tab4['entrega_inicio'] = inicio_mes
+                            filtros_ativos_tab4['entrega_fim'] = ultimo_dia
+                            filtros_ativos_tab4['tem_filtro_entrega'] = True
+                            filtros_ativos_tab4['coluna_entrega'] = coluna_entrega
+                        elif periodo_entrega == "Quinzena":
+                            quinzena_opcao = st.radio(
+                                "Escolha:",
+                                ["1ª quinzena (1-15)", "2ª quinzena (16-31)"],
+                                horizontal=True,
+                                key="tab4_entrega_quinzena_opcao",
+                                label_visibility="collapsed"
+                            )
+                            
+                            ano_atual = hoje.year
+                            mes_atual = hoje.month
+                            
+                            if quinzena_opcao == "1ª quinzena (1-15)":
+                                data_inicio_quinzena = date(ano_atual, mes_atual, 1)
+                                data_fim_quinzena = date(ano_atual, mes_atual, 15)
+                            else:
+                                ultimo_dia = (date(ano_atual, mes_atual, 1) + timedelta(days=32)).replace(day=1) - timedelta(days=1)
+                                data_inicio_quinzena = date(ano_atual, mes_atual, 16)
+                                data_fim_quinzena = ultimo_dia
+                            
+                            filtros_ativos_tab4['entrega_inicio'] = data_inicio_quinzena
+                            filtros_ativos_tab4['entrega_fim'] = data_fim_quinzena
+                            filtros_ativos_tab4['tem_filtro_entrega'] = True
+                            filtros_ativos_tab4['coluna_entrega'] = coluna_entrega
+                            
+                            st.caption(f"📅 {data_inicio_quinzena.strftime('%d/%m')} a {data_fim_quinzena.strftime('%d/%m')}")
+                            
+                        elif periodo_entrega == "Últimos 7 dias":
+                            filtros_ativos_tab4['entrega_inicio'] = hoje - timedelta(days=7)
+                            filtros_ativos_tab4['entrega_fim'] = hoje
+                            filtros_ativos_tab4['tem_filtro_entrega'] = True
+                            filtros_ativos_tab4['coluna_entrega'] = coluna_entrega
+                        elif periodo_entrega == "Últimos 30 dias":
+                            filtros_ativos_tab4['entrega_inicio'] = hoje - timedelta(days=30)
+                            filtros_ativos_tab4['entrega_fim'] = hoje
+                            filtros_ativos_tab4['tem_filtro_entrega'] = True
+                            filtros_ativos_tab4['coluna_entrega'] = coluna_entrega
+                        elif periodo_entrega == "Personalizado":
+                            col_de1, col_de2 = st.columns(2)
+                            with col_de1:
+                                data_ini_entrega = st.date_input("De", data_min_entrega, key="tab4_entrega_ini")
+                            with col_de2:
+                                data_fim_entrega = st.date_input("Até", data_max_entrega, key="tab4_entrega_fim")
+                            filtros_ativos_tab4['entrega_inicio'] = data_ini_entrega
+                            filtros_ativos_tab4['entrega_fim'] = data_fim_entrega
+                            filtros_ativos_tab4['tem_filtro_entrega'] = True
+                            filtros_ativos_tab4['coluna_entrega'] = coluna_entrega
+            else:
+                st.selectbox("📦 Data de Entrega", ["Indisponível"], disabled=True, key="tab4_entrega_disabled")
+        
+        with col_f7:
+            st.markdown("<br>", unsafe_allow_html=True)
+            if st.button("🧹 Limpar Tudo", use_container_width=True, key="tab4_limpar_filtros"):
+                for key in list(st.session_state.keys()):
+                    if key.startswith('tab4_'):
+                        del st.session_state[key]
+                st.rerun()
+    
+    st.divider()
+    
+    # =========================================================
+    # APLICAR FILTROS AO DATAFRAME
+    # =========================================================
+    df_filtrado = df.copy()
+    
+    # Aplicar filtros categóricos
+    for col, valor in filtros_ativos_tab4.items():
+        if col not in ['data_inicio', 'data_fim', 'tem_filtro_data', 
+                       'deadline_inicio', 'deadline_fim', 'tem_filtro_deadline', 'coluna_deadline',
+                       'entrega_inicio', 'entrega_fim', 'tem_filtro_entrega', 'coluna_entrega']:
+            df_filtrado = df_filtrado[df_filtrado[col] == valor]
+    
+    # Aplicar filtro de data de solicitação
+    if 'tem_filtro_data' in filtros_ativos_tab4 and 'Data de Solicitação' in df.columns:
+        data_inicio = pd.Timestamp(filtros_ativos_tab4['data_inicio'])
+        data_fim = pd.Timestamp(filtros_ativos_tab4['data_fim']) + pd.Timedelta(days=1) - pd.Timedelta(seconds=1)
+        df_filtrado = df_filtrado[
+            (df_filtrado['Data de Solicitação'] >= data_inicio) & 
+            (df_filtrado['Data de Solicitação'] <= data_fim)
+        ]
+    
+    # Aplicar filtro de deadline
+    if 'tem_filtro_deadline' in filtros_ativos_tab4 and 'coluna_deadline' in filtros_ativos_tab4:
+        col_deadline = filtros_ativos_tab4['coluna_deadline']
+        if col_deadline in df_filtrado.columns:
+            deadline_inicio = pd.Timestamp(filtros_ativos_tab4['deadline_inicio'])
+            deadline_fim = pd.Timestamp(filtros_ativos_tab4['deadline_fim']) + pd.Timedelta(days=1) - pd.Timedelta(seconds=1)
+            df_filtrado = df_filtrado[
+                (df_filtrado[col_deadline] >= deadline_inicio) & 
+                (df_filtrado[col_deadline] <= deadline_fim)
+            ]
+    
+    # Aplicar filtro de data de entrega
+    if 'tem_filtro_entrega' in filtros_ativos_tab4 and 'coluna_entrega' in filtros_ativos_tab4:
+        col_entrega = filtros_ativos_tab4['coluna_entrega']
+        if col_entrega in df_filtrado.columns:
+            entrega_inicio = pd.Timestamp(filtros_ativos_tab4['entrega_inicio'])
+            entrega_fim = pd.Timestamp(filtros_ativos_tab4['entrega_fim']) + pd.Timedelta(days=1) - pd.Timedelta(seconds=1)
+            df_filtrado = df_filtrado[
+                (df_filtrado[col_entrega] >= entrega_inicio) & 
+                (df_filtrado[col_entrega] <= entrega_fim)
+            ]
+    
+    # Mostrar resumo dos filtros
+    total_filtrado = len(df_filtrado)
+    if filtros_ativos_tab4:
+        st.info(f"🔍 **Filtros ativos:** {total_filtrado} de {len(df)} registros ({total_filtrado/len(df)*100:.1f}%)")
+    
+    # =========================================================
+    # PREPARAR DADOS AGREGADOS POR CAMPANHA
+    # =========================================================
+    with st.spinner("🔄 Agregando dados por campanha..."):
+        # Filtrar apenas linhas com campanha válida
+        df_camp_valid = df_filtrado[df_filtrado[coluna_campanha].notna() & (df_filtrado[coluna_campanha] != '')]
+        
+        if df_camp_valid.empty:
+            st.warning("⚠️ Nenhuma campanha encontrada com os filtros atuais")
+            st.stop()
+        
+        # Construir dicionário de agregação dinamicamente
+        agg_dict = {}
+        
+        # ID (sempre contar)
+        if 'ID' in df_camp_valid.columns:
+            agg_dict['ID'] = 'count'
+        else:
+            # Usar qualquer coluna para contar
+            primeira_coluna = df_camp_valid.columns[0]
+            agg_dict[primeira_coluna] = 'count'
+        
+        # Status
+        if 'Status' in df_camp_valid.columns:
+            agg_dict['Status'] = lambda x: list(x.unique())
+        
+        # Data de Solicitação
+        if 'Data de Solicitação' in df_camp_valid.columns:
+            agg_dict['Data de Solicitação'] = ['min', 'max']
+        
+        # Data de Entrega
+        if 'Data de Entrega' in df_camp_valid.columns:
+            agg_dict['Data de Entrega'] = lambda x: x.count()
+        
+        # Solicitante
+        if 'Solicitante' in df_camp_valid.columns:
+            agg_dict['Solicitante'] = lambda x: list(x.unique())[:3]
+        
+        # Tipo
+        if 'Tipo' in df_camp_valid.columns:
+            agg_dict['Tipo'] = lambda x: list(x.unique())
+        
+        # Executar agregação
+        df_camp = df_camp_valid.groupby(coluna_campanha).agg(agg_dict).reset_index()
+        
+        # Renomear colunas de forma segura
+        column_names = ['Campanha']
+        
+        for col in agg_dict.keys():
+            if col == 'ID' or col == df_camp_valid.columns[0]:
+                column_names.append('Total Demandas')
+            elif col == 'Status':
+                column_names.append('Status')
+            elif col == 'Data de Solicitação':
+                column_names.extend(['Data Início', 'Data Fim'])
+            elif col == 'Data de Entrega':
+                column_names.append('Total Entregues')
+            elif col == 'Solicitante':
+                column_names.append('Solicitantes')
+            elif col == 'Tipo':
+                column_names.append('Tipos')
+            else:
+                column_names.append(col)
+        
+        # Ajustar se tiver número diferente de colunas
+        if len(column_names) == len(df_camp.columns):
+            df_camp.columns = column_names
+        else:
+            # Fallback: usar nomes genéricos
+            df_camp.columns = ['Campanha'] + [f'Col_{i}' for i in range(1, len(df_camp.columns))]
+        
+        # Garantir colunas essenciais
+        if 'Total Demandas' not in df_camp.columns:
+            df_camp['Total Demandas'] = 1
+        
+        if 'Total Entregues' not in df_camp.columns:
+            df_camp['Total Entregues'] = 0
+        
+        # Calcular taxa de conclusão
+        df_camp['Taxa Conclusão'] = (df_camp['Total Entregues'] / df_camp['Total Demandas'] * 100).round(1)
+        
+        # Criar período se tiver datas
+        if 'Data Início' in df_camp.columns and 'Data Fim' in df_camp.columns:
+            df_camp['Período'] = df_camp['Data Início'].dt.strftime('%d/%m') + " a " + df_camp['Data Fim'].dt.strftime('%d/%m/%Y')
+        else:
+            df_camp['Período'] = "Não disponível"
+        
+        # Ordenar por total de demandas
+        df_camp = df_camp.sort_values('Total Demandas', ascending=False).reset_index(drop=True)
+    
+    st.divider()
+    
+    # =========================================================
+    # TABELA EXPANSÍVEL DE CAMPANHAS
+    # =========================================================
+    st.markdown("### 📋 Todas as Campanhas")
+    
+    # Preparar dados para tabela
+    colunas_tabela = ['Campanha', 'Período', 'Total Demandas', 'Total Entregues', 'Taxa Conclusão']
+    
+    if 'Tipos' in df_camp.columns:
+        colunas_tabela.append('Tipos')
+    if 'Solicitantes' in df_camp.columns:
+        colunas_tabela.append('Solicitantes')
+    
+    df_tabela = df_camp[colunas_tabela].copy()
+    
+    # Formatar colunas
+    if 'Tipos' in df_tabela.columns:
+        df_tabela['Tipos'] = df_tabela['Tipos'].apply(lambda x: ', '.join(x[:3]) + ('...' if len(x) > 3 else '') if isinstance(x, list) else '')
+    if 'Solicitantes' in df_tabela.columns:
+        df_tabela['Solicitantes'] = df_tabela['Solicitantes'].apply(lambda x: ', '.join(x) if isinstance(x, list) else '')
+    
+    # Mostrar métricas resumidas (SEM taxa média)
+    col_res1, col_res2, col_res3 = st.columns(3)
+    with col_res1:
+        st.metric("Total Campanhas", len(df_tabela))
+    with col_res2:
+        st.metric("Total Demandas", int(df_tabela['Total Demandas'].sum()))
+    with col_res3:
+        st.metric("Total Entregues", int(df_tabela['Total Entregues'].sum()))
+    
+    st.divider()
+    
+    # Tabela interativa
+    for idx, row in df_tabela.iterrows():
+        with st.container():
+            # Linha da campanha
+            cols = st.columns([3, 2, 1, 1, 1, 2])
+            
+            with cols[0]:
+                st.markdown(f"**{row['Campanha']}**")
+            with cols[1]:
+                st.caption(row['Período'])
+            with cols[2]:
+                st.markdown(f"**{int(row['Total Demandas'])}**")
+            with cols[3]:
+                st.markdown(f"**{int(row['Total Entregues'])}**")
+            with cols[4]:
+                st.markdown(f"**{row['Taxa Conclusão']}%**")
+            with cols[5]:
+                if 'Solicitantes' in row:
+                    st.markdown(f"_{row['Solicitantes']}_")
+            
+            # Expansor para ver detalhes
+            with st.expander(f"📌 Ver demandas de: {row['Campanha'][:30]}..."):
+                # Filtrar demandas desta campanha
+                demandas_campanha = df_camp_valid[df_camp_valid[coluna_campanha] == row['Campanha']]
+                
+                # Mostrar métricas rápidas
+                col_det1, col_det2, col_det3 = st.columns(3)
+                with col_det1:
+                    st.metric("Total Demandas", len(demandas_campanha))
+                with col_det2:
+                    if 'Status' in demandas_campanha.columns:
+                        conc = len(demandas_campanha[demandas_campanha['Status'].str.contains('Concluído|Aprovado', na=False, case=False)])
+                        st.metric("Concluídas", conc)
+                    else:
+                        st.metric("Concluídas", "N/A")
+                with col_det3:
+                    if 'Status' in demandas_campanha.columns and len(demandas_campanha) > 0:
+                        conc = len(demandas_campanha[demandas_campanha['Status'].str.contains('Concluído|Aprovado', na=False, case=False)])
+                        st.metric("Taxa", f"{conc/len(demandas_campanha)*100:.1f}%")
+                    else:
+                        st.metric("Taxa", "N/A")
+                
+                # Mostrar tabela de demandas
+                colunas_display = []
+                for col in ['ID', 'Status', 'Prioridade', 'Data de Solicitação', 'Deadline', 'Tipo', 'Solicitante']:
+                    if col in demandas_campanha.columns:
+                        colunas_display.append(col)
+                
+                if colunas_display:
+                    st.dataframe(
+                        demandas_campanha[colunas_display].head(10),
+                        use_container_width=True,
+                        hide_index=True
+                    )
+                    if len(demandas_campanha) > 10:
+                        st.caption(f"Mostrando 10 de {len(demandas_campanha)} demandas")
+            
+            st.divider()
 # =========================================================
 # EXPORTAÇÃO (COMPLETA EM MÚLTIPLOS FORMATOS)
 # =========================================================
