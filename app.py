@@ -2050,7 +2050,7 @@ with tab3:
     else:
         st.warning("⚠️ Nenhum registro encontrado com os filtros e pesquisa atuais.")
 # =========================================================
-# TAB 4: ANÁLISE DE CAMPANHAS
+# TAB 4: ANÁLISE DE CAMPANHAS (CORRIGIDA)
 # =========================================================
 with tab4:
     st.markdown("## 📊 Análise de Campanhas")
@@ -2434,7 +2434,7 @@ with tab4:
         st.info(f"🔍 **Filtros ativos:** {total_filtrado} de {len(df)} registros ({total_filtrado/len(df)*100:.1f}%)")
     
     # =========================================================
-    # PREPARAR DADOS AGREGADOS POR CAMPANHA
+    # PREPARAR DADOS AGREGADOS POR CAMPANHA (CORRIGIDO!)
     # =========================================================
     with st.spinner("🔄 Agregando dados por campanha..."):
         # Filtrar apenas linhas com campanha válida
@@ -2444,32 +2444,93 @@ with tab4:
             st.warning("⚠️ Nenhuma campanha encontrada com os filtros atuais")
             st.stop()
         
-        # Agrupar por campanha
-        df_camp = df_camp_valid.groupby(coluna_campanha).agg({
-            'ID': 'count',
-            'Status': lambda x: list(x.unique()),
-            'Data de Solicitação': ['min', 'max'],
-            'Data de Entrega': lambda x: x.count(),
-            'Solicitante': lambda x: list(x.unique())[:3],
-            'Tipo': lambda x: list(x.unique()),
-            'Tipo Atividade': lambda x: list(x.unique()) if 'Tipo Atividade' in df_camp_valid.columns else lambda x: [],
-            'Peça': lambda x: list(x.unique())[:3] if 'Peça' in df_camp_valid.columns else lambda x: []
-        }).reset_index()
+        # Construir dicionário de agregação dinamicamente
+        agg_dict = {}
         
-        # Achatar colunas
-        nomes_colunas = ['Campanha', 'Total Demandas', 'Status', 
-                        'Data Início', 'Data Fim', 'Total Entregues',
-                        'Solicitantes', 'Tipos', 'Tipos Atividade', 'Peças']
+        # ID (sempre contar)
+        if 'ID' in df_camp_valid.columns:
+            agg_dict['ID'] = 'count'
+        else:
+            # Usar qualquer coluna para contar
+            primeira_coluna = df_camp_valid.columns[0]
+            agg_dict[primeira_coluna] = 'count'
         
-        # Ajustar se não tiver todas as colunas
-        if len(nomes_colunas) > len(df_camp.columns):
-            nomes_colunas = nomes_colunas[:len(df_camp.columns)]
+        # Status
+        if 'Status' in df_camp_valid.columns:
+            agg_dict['Status'] = lambda x: list(x.unique())
         
-        df_camp.columns = nomes_colunas
+        # Data de Solicitação
+        if 'Data de Solicitação' in df_camp_valid.columns:
+            agg_dict['Data de Solicitação'] = ['min', 'max']
+        
+        # Data de Entrega
+        if 'Data de Entrega' in df_camp_valid.columns:
+            agg_dict['Data de Entrega'] = lambda x: x.count()
+        
+        # Solicitante
+        if 'Solicitante' in df_camp_valid.columns:
+            agg_dict['Solicitante'] = lambda x: list(x.unique())[:3]
+        
+        # Tipo
+        if 'Tipo' in df_camp_valid.columns:
+            agg_dict['Tipo'] = lambda x: list(x.unique())
+        
+        # Tipo Atividade
+        if 'Tipo Atividade' in df_camp_valid.columns:
+            agg_dict['Tipo Atividade'] = lambda x: list(x.unique())
+        
+        # Peça
+        if 'Peça' in df_camp_valid.columns:
+            agg_dict['Peça'] = lambda x: list(x.unique())[:3]
+        
+        # Executar agregação
+        df_camp = df_camp_valid.groupby(coluna_campanha).agg(agg_dict).reset_index()
+        
+        # Renomear colunas de forma segura
+        column_names = ['Campanha']
+        
+        for col in agg_dict.keys():
+            if col == 'ID' or col == df_camp_valid.columns[0]:
+                column_names.append('Total Demandas')
+            elif col == 'Status':
+                column_names.append('Status')
+            elif col == 'Data de Solicitação':
+                column_names.extend(['Data Início', 'Data Fim'])
+            elif col == 'Data de Entrega':
+                column_names.append('Total Entregues')
+            elif col == 'Solicitante':
+                column_names.append('Solicitantes')
+            elif col == 'Tipo':
+                column_names.append('Tipos')
+            elif col == 'Tipo Atividade':
+                column_names.append('Tipos Atividade')
+            elif col == 'Peça':
+                column_names.append('Peças')
+            else:
+                column_names.append(col)
+        
+        # Ajustar se tiver número diferente de colunas
+        if len(column_names) == len(df_camp.columns):
+            df_camp.columns = column_names
+        else:
+            # Fallback: usar nomes genéricos
+            df_camp.columns = ['Campanha'] + [f'Col_{i}' for i in range(1, len(df_camp.columns))]
+        
+        # Garantir colunas essenciais
+        if 'Total Demandas' not in df_camp.columns:
+            df_camp['Total Demandas'] = 1
+        
+        if 'Total Entregues' not in df_camp.columns:
+            df_camp['Total Entregues'] = 0
         
         # Calcular métricas adicionais
         df_camp['Taxa Conclusão'] = (df_camp['Total Entregues'] / df_camp['Total Demandas'] * 100).round(1)
-        df_camp['Período'] = df_camp['Data Início'].dt.strftime('%d/%m') + " a " + df_camp['Data Fim'].dt.strftime('%d/%m/%Y')
+        
+        # Criar período se tiver datas
+        if 'Data Início' in df_camp.columns and 'Data Fim' in df_camp.columns:
+            df_camp['Período'] = df_camp['Data Início'].dt.strftime('%d/%m') + " a " + df_camp['Data Fim'].dt.strftime('%d/%m/%Y')
+        else:
+            df_camp['Período'] = "Não disponível"
         
         # Ordenar por total de demandas
         df_camp = df_camp.sort_values('Total Demandas', ascending=False).reset_index(drop=True)
@@ -2624,106 +2685,120 @@ with tab4:
     st.markdown("### 📋 Todas as Campanhas")
     
     # Preparar dados para tabela
-    df_tabela = df_camp[[
-        'Campanha', 'Período', 'Total Demandas', 'Total Entregues',
-        'Taxa Conclusão', 'Tipos', 'Solicitantes'
-    ]].copy()
+    colunas_tabela = ['Campanha', 'Período', 'Total Demandas', 'Total Entregues', 'Taxa Conclusão']
+    
+    if 'Tipos' in df_camp.columns:
+        colunas_tabela.append('Tipos')
+    if 'Solicitantes' in df_camp.columns:
+        colunas_tabela.append('Solicitantes')
+    
+    df_tabela = df_camp[colunas_tabela].copy()
     
     # Formatar colunas
-    df_tabela['Tipos'] = df_tabela['Tipos'].apply(lambda x: ', '.join(x[:3]) + ('...' if len(x) > 3 else '') if isinstance(x, list) else '')
-    df_tabela['Solicitantes'] = df_tabela['Solicitantes'].apply(lambda x: ', '.join(x) if isinstance(x, list) else '')
+    if 'Tipos' in df_tabela.columns:
+        df_tabela['Tipos'] = df_tabela['Tipos'].apply(lambda x: ', '.join(x[:3]) + ('...' if len(x) > 3 else '') if isinstance(x, list) else '')
+    if 'Solicitantes' in df_tabela.columns:
+        df_tabela['Solicitantes'] = df_tabela['Solicitantes'].apply(lambda x: ', '.join(x) if isinstance(x, list) else '')
     
-    # Criar coluna de índice para expansão
-    df_tabela['Detalhes'] = "Clique para ver demandas"
+    # Mostrar métricas resumidas
+    col_res1, col_res2, col_res3, col_res4 = st.columns(4)
+    with col_res1:
+        st.metric("Total Campanhas", len(df_tabela))
+    with col_res2:
+        st.metric("Total Demandas", int(df_tabela['Total Demandas'].sum()))
+    with col_res3:
+        st.metric("Total Entregues", int(df_tabela['Total Entregues'].sum()))
+    with col_res4:
+        taxa_media = df_tabela['Taxa Conclusão'].mean()
+        st.metric("Taxa Média", f"{taxa_media:.1f}%")
     
-    # Criar dataframe expansível
-    with st.expander("📋 Ver lista completa de campanhas", expanded=True):
-        # Mostrar métricas resumidas
-        col_res1, col_res2, col_res3, col_res4 = st.columns(4)
-        with col_res1:
-            st.metric("Total Campanhas", len(df_tabela))
-        with col_res2:
-            st.metric("Total Demandas", df_tabela['Total Demandas'].sum())
-        with col_res3:
-            st.metric("Total Entregues", df_tabela['Total Entregues'].sum())
-        with col_res4:
-            taxa_media = df_tabela['Taxa Conclusão'].mean()
-            st.metric("Taxa Média", f"{taxa_media:.1f}%")
+    st.divider()
+    
+    # Tabela interativa
+    for idx, row in df_tabela.iterrows():
+        # Determinar se esta é a campanha selecionada
+        is_selected = row['Campanha'] == st.session_state.tab4_campanha_selecionada
         
-        st.divider()
-        
-        # Tabela interativa
-        for idx, row in df_tabela.iterrows():
-            # Determinar se esta é a campanha selecionada
-            is_selected = row['Campanha'] == st.session_state.tab4_campanha_selecionada
+        # Container com destaque se selecionada
+        with st.container():
+            if is_selected:
+                st.markdown(f"""
+                <div style="background: rgba(255, 102, 0, 0.1); padding: 10px; border-radius: 10px; border-left: 5px solid #FF6600; margin-bottom: 10px;">
+                    <p style="margin:0; font-weight:bold; color:#FF6600;">🔍 Campanha selecionada:</p>
+                </div>
+                """, unsafe_allow_html=True)
             
-            # Container com destaque se selecionada
-            with st.container():
-                if is_selected:
-                    st.markdown(f"""
-                    <div style="background: rgba(255, 102, 0, 0.1); padding: 10px; border-radius: 10px; border-left: 5px solid #FF6600; margin-bottom: 10px;">
-                        <p style="margin:0; font-weight:bold; color:#FF6600;">🔍 Campanha selecionada:</p>
-                    </div>
-                    """, unsafe_allow_html=True)
-                
-                # Linha da campanha
-                col1, col2, col3, col4, col5 = st.columns([3, 2, 1, 1, 2])
-                
-                with col1:
-                    st.markdown(f"**{row['Campanha']}**")
-                with col2:
-                    st.caption(row['Período'])
-                with col3:
-                    st.markdown(f"**{row['Total Demandas']}**")
-                with col4:
-                    st.markdown(f"**{row['Total Entregues']}**")
-                with col5:
+            # Linha da campanha
+            cols = st.columns([3, 2, 1, 1, 1, 2])
+            
+            with cols[0]:
+                st.markdown(f"**{row['Campanha']}**")
+            with cols[1]:
+                st.caption(row['Período'])
+            with cols[2]:
+                st.markdown(f"**{int(row['Total Demandas'])}**")
+            with cols[3]:
+                st.markdown(f"**{int(row['Total Entregues'])}**")
+            with cols[4]:
+                st.markdown(f"**{row['Taxa Conclusão']}%**")
+            with cols[5]:
+                if 'Solicitantes' in row:
                     st.markdown(f"_{row['Solicitantes']}_")
+            
+            # Expansor para ver detalhes
+            with st.expander(f"📌 Ver demandas de: {row['Campanha'][:30]}..."):
+                # Filtrar demandas desta campanha
+                demandas_campanha = df_camp_valid[df_camp_valid[coluna_campanha] == row['Campanha']]
                 
-                # Expansor para ver detalhes
-                with st.expander(f"📌 Ver demandas de: {row['Campanha'][:30]}..."):
-                    # Filtrar demandas desta campanha
-                    demandas_campanha = df_camp_valid[df_camp_valid[coluna_campanha] == row['Campanha']]
-                    
-                    # Mostrar métricas rápidas
-                    col_det1, col_det2, col_det3 = st.columns(3)
-                    with col_det1:
-                        st.metric("Total Demandas", len(demandas_campanha))
-                    with col_det2:
+                # Mostrar métricas rápidas
+                col_det1, col_det2, col_det3 = st.columns(3)
+                with col_det1:
+                    st.metric("Total Demandas", len(demandas_campanha))
+                with col_det2:
+                    if 'Status' in demandas_campanha.columns:
                         conc = len(demandas_campanha[demandas_campanha['Status'].str.contains('Concluído|Aprovado', na=False, case=False)])
                         st.metric("Concluídas", conc)
-                    with col_det3:
-                        st.metric("Taxa", f"{conc/len(demandas_campanha)*100:.1f}%" if len(demandas_campanha) > 0 else "0%")
-                    
-                    # Mostrar tabela de demandas
-                    colunas_display = []
-                    for col in ['ID', 'Status', 'Prioridade', 'Data de Solicitação', 'Deadline', 'Tipo', 'Solicitante']:
-                        if col in demandas_campanha.columns:
-                            colunas_display.append(col)
-                    
-                    if colunas_display:
-                        st.dataframe(
-                            demandas_campanha[colunas_display].head(10),
-                            use_container_width=True,
-                            hide_index=True
-                        )
-                        if len(demandas_campanha) > 10:
-                            st.caption(f"Mostrando 10 de {len(demandas_campanha)} demandas")
+                    else:
+                        st.metric("Concluídas", "N/A")
+                with col_det3:
+                    if 'Status' in demandas_campanha.columns and len(demandas_campanha) > 0:
+                        conc = len(demandas_campanha[demandas_campanha['Status'].str.contains('Concluído|Aprovado', na=False, case=False)])
+                        st.metric("Taxa", f"{conc/len(demandas_campanha)*100:.1f}%")
+                    else:
+                        st.metric("Taxa", "N/A")
                 
-                if is_selected:
-                    # Scroll automático via JavaScript
-                    st.markdown("""
-                    <script>
-                        setTimeout(function() {
-                            var element = document.querySelector('div[data-testid="stVerticalBlock"] > div:has(div[style*="background: rgba(255, 102, 0, 0.1)"])');
-                            if (element) {
-                                element.scrollIntoView({behavior: 'smooth', block: 'center'});
-                            }
-                        }, 100);
-                    </script>
-                    """, unsafe_allow_html=True)
+                # Mostrar tabela de demandas
+                colunas_display = []
+                for col in ['ID', 'Status', 'Prioridade', 'Data de Solicitação', 'Deadline', 'Tipo', 'Solicitante']:
+                    if col in demandas_campanha.columns:
+                        colunas_display.append(col)
                 
-                st.divider()
+                if colunas_display:
+                    st.dataframe(
+                        demandas_campanha[colunas_display].head(10),
+                        use_container_width=True,
+                        hide_index=True
+                    )
+                    if len(demandas_campanha) > 10:
+                        st.caption(f"Mostrando 10 de {len(demandas_campanha)} demandas")
+            
+            if is_selected:
+                # JavaScript para scroll automático
+                st.markdown(f"""
+                <script>
+                    setTimeout(function() {{
+                        var elements = document.querySelectorAll('div[data-testid="stVerticalBlock"] > div');
+                        for(var i = 0; i < elements.length; i++) {{
+                            if(elements[i].innerText.includes("{row['Campanha'][:20]}")) {{
+                                elements[i].scrollIntoView({{behavior: 'smooth', block: 'center'}});
+                                break;
+                            }}
+                        }}
+                    }}, 500);
+                </script>
+                """, unsafe_allow_html=True)
+            
+            st.divider()
 # =========================================================
 # EXPORTAÇÃO (COMPLETA EM MÚLTIPLOS FORMATOS)
 # =========================================================
