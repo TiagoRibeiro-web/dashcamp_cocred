@@ -2594,12 +2594,12 @@ with tab4:
             st.metric("Total Campanhas", len(df_tabela))
         with col_res2:
             st.metric("Total Demandas", int(df_tabela['Total Demandas'].sum()))
-        with col_res3:
-            st.metric(
-                "Taxa Média", 
-                f"{df_tabela['Taxa Conclusão'].mean():.1f}%",
-                help="Média das taxas individuais de cada campanha. Cada taxa é calculada como (demandas concluídas ÷ total de demandas) × 100"
-            )
+        # with col_res3:
+        #     st.metric(
+        #         "Taxa Média", 
+        #         f"{df_tabela['Taxa Conclusão'].mean():.1f}%",
+        #         help="Média das taxas individuais de cada campanha. Cada taxa é calculada como (demandas concluídas ÷ total de demandas) × 100"
+        #     )
         
         st.divider()
     
