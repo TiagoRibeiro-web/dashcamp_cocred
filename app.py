@@ -2607,7 +2607,7 @@ with tab4:
     for idx, row in df_tabela.iterrows():
         with st.container():
             # Linha da campanha
-            cols = st.columns([3, 2, 1, 1, 2])
+            cols = st.columns([ 2, 1, 1, 2])
             
             with cols[0]:
                 st.markdown(f"**{row['Campanha']}**")
