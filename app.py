@@ -2053,7 +2053,7 @@ with tab3:
 # TAB 4: ANÁLISE DE CAMPANHAS (COM TOOLTIPS)
 # =========================================================
 with tab4:
-    st.markdown("## 📋 Catálogo de Campanhas")
+    st.markdown("## 📋 Catálogo de Demandas")
     
     # Identificar coluna de campanha
     coluna_campanha = None
@@ -2521,7 +2521,7 @@ with tab4:
     # =========================================================
     # SELETOR DE CAMPANHA
     # =========================================================
-    st.markdown("### 🎯 Selecionar Campanha")
+    st.markdown("### 🎯 Selecionar Demanda")
     
     col_sel1, col_sel2 = st.columns([3, 1])
     
