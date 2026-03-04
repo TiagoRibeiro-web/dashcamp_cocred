@@ -2589,7 +2589,7 @@ with tab4:
     
     # Mostrar métricas resumidas (apenas quando mostra todas)
     if campanha_selecionada == 'Todas':
-        col_res1, col_res2 = st.columns(2)
+        col_res1, col_res2, col_res3 = st.columns(3)
         with col_res1:
             st.metric("Total Demandas", len(df_tabela))
         with col_res2:
@@ -2615,11 +2615,11 @@ with tab4:
                 st.caption(row['Período'])
             with cols[2]:
                 st.markdown(f"**{int(row['Total Demandas'])}**")
-            with cols[3]:
-                st.markdown(
-                    f"**{row['Taxa Conclusão']}%**",
-                    help="Taxa calculada com base em demandas com status 'Concluído' ou 'Aprovado'"
-                )
+            #with cols[3]:
+                # st.markdown(
+                #     f"**{row['Taxa Conclusão']}%**",
+                #     help="Taxa calculada com base em demandas com status 'Concluído' ou 'Aprovado'"
+                # )
             with cols[4]:
                 if 'Solicitantes' in row:
                     st.markdown(f"_{row['Solicitantes']}_")
