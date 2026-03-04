@@ -2680,34 +2680,74 @@ with tab4:
     # Tabela interativa
     for idx, row in df_tabela.iterrows():
         with st.container():
-            # Determinar quantas colunas teremos na linha
-            num_colunas = len(colunas_tabela)
+            # Criar uma linha com apenas as colunas que queremos mostrar
+            # Vamos forçar a mostrar apenas: Campanha, Período e Total Demandas
+            col1, col2, col3 = st.columns([3, 2, 1])
             
-            # Criar colunas proporcionais
-            if num_colunas == 3:
-                cols = st.columns([3, 2, 1])
-            elif num_colunas == 4:
-                cols = st.columns([3, 2, 1, 2])
-            elif num_colunas == 5:
-                cols = st.columns([3, 2, 1, 1, 1])
+        with col1:
+            # Mostrar apenas o nome da campanha
+            if 'Campanha' in row:
+                st.markdown(f"**{row['Campanha']}**")
             else:
-                proporcoes = [3] + [1] * (num_colunas - 1)
-                cols = st.columns(proporcoes)
+                st.markdown(f"**Campanha {idx+1}**")
+        
+        with col2:
+            # Mostrar apenas o período
+            if 'Período' in row:
+                st.caption(str(row['Período']))
+            else:
+                st.caption("Período não disponível")
+        
+        with col3:
+            # Mostrar apenas o total de demandas
+            if 'Total Demandas' in row:
+                st.markdown(f"**{int(row['Total Demandas'])}**")
+            else:
+                st.markdown("**0**")
+        
+        # Expansor para ver detalhes
+        nome_campanha = row['Campanha'] if 'Campanha' in row else f"Campanha {idx+1}"
+        
+        with st.expander(f"📌 Ver demandas de: {str(nome_campanha)[:30]}..."):
+            # Filtrar demandas desta campanha
+            if 'Campanha' in df_camp_valid.columns:
+                demandas_campanha = df_camp_valid[df_camp_valid['Campanha'] == nome_campanha]
+            else:
+                demandas_campanha = df_camp_valid[df_camp_valid[coluna_campanha] == nome_campanha]
             
-            # Preencher cada coluna
-            for i, col_nome in enumerate(colunas_tabela):
-                if i < len(cols):
-                    with cols[i]:
-                        valor = row[col_nome]
-                        
-                        if col_nome == 'Campanha':
-                            st.markdown(f"**{valor}**")
-                        elif col_nome == 'Período':
-                            st.caption(str(valor))
-                        elif col_nome == 'Total Demandas':
-                            st.markdown(f"**{int(valor)}**")
-                        else:
-                            st.markdown(f"_{str(valor)[:30]}_" if len(str(valor)) > 30 else f"_{str(valor)}_")
+            # Mostrar métricas rápidas
+            col_det1, col_det2, col_det3 = st.columns(3)
+            with col_det1:
+                st.metric("Total Demandas", len(demandas_campanha))
+            with col_det2:
+                if 'Status' in demandas_campanha.columns:
+                    conc = len(demandas_campanha[demandas_campanha['Status'].str.contains('Concluído|Aprovado', na=False, case=False)])
+                    st.metric("Concluídas", conc)
+                else:
+                    st.metric("Concluídas", "N/A")
+            with col_det3:
+                if 'Status' in demandas_campanha.columns and len(demandas_campanha) > 0:
+                    conc = len(demandas_campanha[demandas_campanha['Status'].str.contains('Concluído|Aprovado', na=False, case=False)])
+                    st.metric("Taxa", f"{conc/len(demandas_campanha)*100:.1f}%")
+                else:
+                    st.metric("Taxa", "N/A")
+            
+            # Mostrar tabela de demandas
+            colunas_display = []
+            for col in ['ID', 'Status', 'Prioridade', 'Data de Solicitação', 'Deadline', 'Tipo', 'Solicitante']:
+                if col in demandas_campanha.columns:
+                    colunas_display.append(col)
+            
+            if colunas_display:
+                st.dataframe(
+                    demandas_campanha[colunas_display],
+                    use_container_width=True,
+                    height=min(500, len(demandas_campanha) * 35 + 50),
+                    hide_index=True
+                )
+                st.caption(f"Total: {len(demandas_campanha)} demandas")
+        
+            st.divider()
             
             # Expansor para ver detalhes
             if 'Campanha' in df_tabela_exibicao.columns:
