@@ -1352,7 +1352,7 @@ with tab2:
                     with col_m2:
                         concluidas = len(df_filtrado[df_filtrado['Status'].str.contains('Concluído|Aprovado', na=False, case=False)])
                         taxa = (concluidas / len(df_filtrado) * 100) if len(df_filtrado) > 0 else 0
-                        st.metric("Taxa Conclusão", f"{taxa:.1f}%")
+                        #st.metric("Taxa Conclusão", f"{taxa:.1f}%")
             else:
                 st.info(f"ℹ️ Sem dados para esta campanha")
         else:
@@ -2607,7 +2607,7 @@ with tab4:
     for idx, row in df_tabela.iterrows():
         with st.container():
             # Linha da campanha
-            cols = st.columns([ 2, 1, 1, 2])
+            cols = st.columns([3, 2, 1, 1, 2])
             
             with cols[0]:
                 st.markdown(f"**{row['Campanha']}**")
@@ -2615,11 +2615,11 @@ with tab4:
                 st.caption(row['Período'])
             with cols[2]:
                 st.markdown(f"**{int(row['Total Demandas'])}**")
-            # with cols[3]:
-            #     st.markdown(
-            #         f"**{row['Taxa Conclusão']}%**",
-            #         help="Taxa calculada com base em demandas com status 'Concluído' ou 'Aprovado'"
-            #     )
+            with cols[3]:
+                st.markdown(
+                    f"**{row['Taxa Conclusão']}%**",
+                    help="Taxa calculada com base em demandas com status 'Concluído' ou 'Aprovado'"
+                )
             with cols[4]:
                 if 'Solicitantes' in row:
                     st.markdown(f"_{row['Solicitantes']}_")
