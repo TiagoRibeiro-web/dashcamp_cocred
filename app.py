@@ -2431,72 +2431,47 @@ with tab4:
     # =========================================================
     # PREPARAR DADOS AGREGADOS POR CAMPANHA
     # =========================================================
-    # =========================================================
-# PREPARAR DADOS AGREGADOS POR CAMPANHA (CORRIGIDO)
-# =========================================================
-with st.spinner("🔄 Agregando dados por campanha..."):
-    # Filtrar apenas linhas com campanha válida
-    df_camp_valid = df_filtrado[df_filtrado[coluna_campanha].notna() & (df_filtrado[coluna_campanha] != '')]
-    
-    if df_camp_valid.empty:
-        st.warning("⚠️ Nenhuma campanha encontrada com os filtros atuais")
-        st.stop()
-    
-    # PRIMEIRO: Calcular total de demandas por campanha
-    df_total = df_camp_valid.groupby(coluna_campanha).size().reset_index(name='Total Demandas')
-    
-    # SEGUNDO: Calcular demandas concluídas por campanha (se houver coluna Status)
-    if 'Status' in df_camp_valid.columns:
-        # Filtrar apenas as concluídas/aprovadas
-        df_concluidas = df_camp_valid[
-            df_camp_valid['Status'].str.contains('Concluído|Aprovado', na=False, case=False)
-        ].groupby(coluna_campanha).size().reset_index(name='Total Concluídas')
+    with st.spinner("🔄 Agregando dados por campanha..."):
+        # Filtrar apenas linhas com campanha válida
+        df_camp_valid = df_filtrado[df_filtrado[coluna_campanha].notna() & (df_filtrado[coluna_campanha] != '')]
         
-        # Fazer merge dos dataframes
-        df_camp = pd.merge(df_total, df_concluidas, on=coluna_campanha, how='left')
+        if df_camp_valid.empty:
+            st.warning("⚠️ Nenhuma campanha encontrada com os filtros atuais")
+            st.stop()
         
-        # Preencher NaN com 0 (campanhas sem nenhuma concluída)
-        df_camp['Total Concluídas'] = df_camp['Total Concluídas'].fillna(0)
-    else:
-        # Se não tiver coluna Status, criar coluna de concluídas com 0
-        df_camp = df_total.copy()
-        df_camp['Total Concluídas'] = 0
-    
-    # TERCEIRO: Calcular a taxa de conclusão
-    df_camp['Taxa Conclusão'] = (df_camp['Total Concluídas'] / df_camp['Total Demandas'] * 100).round(1)
-    
-    # QUARTO: Adicionar outras informações relevantes (opcional)
-    
-    # Data de Solicitação (min e max) - se disponível
-    if 'Data de Solicitação' in df_camp_valid.columns:
-        datas = df_camp_valid.groupby(coluna_campanha)['Data de Solicitação'].agg(['min', 'max']).reset_index()
-        datas.columns = [coluna_campanha, 'Data Início', 'Data Fim']
-        df_camp = pd.merge(df_camp, datas, on=coluna_campanha, how='left')
-    
-    # Solicitantes (top 3) - se disponível
-    if 'Solicitante' in df_camp_valid.columns:
-        # Função para pegar os top 3 solicitantes
-        def get_top_solicitantes(group):
-            return list(group.value_counts().nlargest(3).index)
+        # Construir dicionário de agregação dinamicamente
+        agg_dict = {}
         
-        solicitantes = df_camp_valid.groupby(coluna_campanha)['Solicitante'].apply(get_top_solicitantes).reset_index()
-        solicitantes.columns = [coluna_campanha, 'Solicitantes']
-        df_camp = pd.merge(df_camp, solicitantes, on=coluna_campanha, how='left')
-    
-    # Tipos - se disponível
-    if 'Tipo' in df_camp_valid.columns:
-        tipos = df_camp_valid.groupby(coluna_campanha)['Tipo'].apply(lambda x: list(x.unique())).reset_index()
-        tipos.columns = [coluna_campanha, 'Tipos']
-        df_camp = pd.merge(df_camp, tipos, on=coluna_campanha, how='left')
-    
-    # Criar período se tiver datas
-    if 'Data Início' in df_camp.columns and 'Data Fim' in df_camp.columns:
-        df_camp['Período'] = df_camp['Data Início'].dt.strftime('%d/%m') + " a " + df_camp['Data Fim'].dt.strftime('%d/%m/%Y')
-    else:
-        df_camp['Período'] = "Não disponível"
-    
-        # Ordenar por total de demandas
-        df_camp = df_camp.sort_values('Total Demandas', ascending=False).reset_index(drop=True)
+        # ID (sempre contar)
+        if 'ID' in df_camp_valid.columns:
+            agg_dict['ID'] = 'count'
+        else:
+            # Usar qualquer coluna para contar
+            primeira_coluna = df_camp_valid.columns[0]
+            agg_dict[primeira_coluna] = 'count'
+        
+        # Status
+        if 'Status' in df_camp_valid.columns:
+            agg_dict['Status'] = lambda x: list(x.unique())
+        
+        # Data de Solicitação
+        if 'Data de Solicitação' in df_camp_valid.columns:
+            agg_dict['Data de Solicitação'] = ['min', 'max']
+        
+        # Data de Entrega
+        if 'Data de Entrega' in df_camp_valid.columns:
+            agg_dict['Data de Entrega'] = lambda x: x.count()
+        
+        # Solicitante
+        if 'Solicitante' in df_camp_valid.columns:
+            agg_dict['Solicitante'] = lambda x: list(x.unique())[:3]
+        
+        # Tipo
+        if 'Tipo' in df_camp_valid.columns:
+            agg_dict['Tipo'] = lambda x: list(x.unique())
+        
+        # Executar agregação
+        df_camp = df_camp_valid.groupby(coluna_campanha).agg(agg_dict).reset_index()
         
         # Renomear colunas de forma segura
         column_names = ['Campanha']
