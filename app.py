@@ -2660,7 +2660,7 @@ with tab4:
             
             st.divider()
 # =========================================================
-# EXPORTAÇÃO (COMPLETA EM MÚLTIPLOS FORMATOS)
+# EXPORTAÇÃO (FORA DAS TABS)
 # =========================================================
 st.header("💾 Exportar Dados (Todos os Formatos)")
 
