@@ -2591,9 +2591,9 @@ with tab4:
     if campanha_selecionada == 'Todas':
         col_res1, col_res2, col_res3 = st.columns(3)
         with col_res1:
-            st.metric("Total Campanhas", len(df_tabela))
+            st.metric("Total Demandas", len(df_tabela))
         with col_res2:
-            st.metric("Total Demandas", int(df_tabela['Total Demandas'].sum()))
+            st.metric("Total Entregas", int(df_tabela['Total Demandas'].sum()))
         # with col_res3:
         #     st.metric(
         #         "Taxa Média", 
