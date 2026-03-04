@@ -2572,7 +2572,7 @@ with tab4:
         df_tabela_exibicao = df_camp.copy()
     
     # Preparar dados para tabela
-    colunas_tabela = ['Campanha', 'Período', 'Total Demandas', 'Taxa Conclusão']
+    colunas_tabela = ['Campanha', 'Período', 'Total Demandas']
     
     if 'Tipos' in df_tabela_exibicao.columns:
         colunas_tabela.append('Tipos')
