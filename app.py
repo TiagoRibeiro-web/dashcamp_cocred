@@ -2428,158 +2428,118 @@ with tab4:
     if filtros_ativos_tab4:
         st.info(f"🔍 **Filtros ativos:** {total_filtrado} de {len(df)} registros ({total_filtrado/len(df)*100:.1f}%)")
     
-# =========================================================
-# PREPARAR DADOS AGREGADOS POR CAMPANHA (CORRIGIDO - NOMES DE COLUNAS)
-# =========================================================
-with st.spinner("🔄 Agregando dados por campanha..."):
-    # Filtrar apenas linhas com campanha válida
-    df_camp_valid = df_filtrado[df_filtrado[coluna_campanha].notna() & (df_filtrado[coluna_campanha] != '')]
-    
-    if df_camp_valid.empty:
-        st.warning("⚠️ Nenhuma campanha encontrada com os filtros atuais")
-        st.stop()
-    
-    # Criar uma cópia para não modificar o original
-    df_agg = df_camp_valid.copy()
-    
-    # Criar coluna auxiliar para contar concluídas baseado no Status
-    if 'Status' in df_agg.columns:
-        df_agg['is_concluida'] = df_agg['Status'].str.contains('Concluído|Aprovado', na=False, case=False).astype(int)
-    else:
-        df_agg['is_concluida'] = 0
-    
-    # Agregar tudo de uma vez
-    agg_dict = {
-        'is_concluida': 'sum',  # Soma das concluídas
-    }
-    
-    # Adicionar contagem total (usando qualquer coluna)
-    if 'ID' in df_agg.columns:
-        agg_dict['ID'] = 'count'
-    else:
-        # Usar a primeira coluna disponível para contar
-        primeira_coluna = df_agg.columns[0]
-        agg_dict[primeira_coluna] = 'count'
-    
-    # Adicionar datas se disponíveis
-    if 'Data de Solicitação' in df_agg.columns:
-        agg_dict['Data de Solicitação'] = ['min', 'max']
-    
-    # Adicionar solicitantes (como lista dos únicos)
-    if 'Solicitante' in df_agg.columns:
-        agg_dict['Solicitante'] = lambda x: list(x.dropna().unique())[:3]
-    
-    # Adicionar tipos (como lista dos únicos)
-    if 'Tipo' in df_agg.columns:
-        agg_dict['Tipo'] = lambda x: list(x.dropna().unique())
-    
-    # Executar agregação
-    df_camp = df_agg.groupby(coluna_campanha).agg(agg_dict).reset_index()
-    
-    # IMPORTANTE: Guardar o nome original da coluna de campanha
-    nome_coluna_campanha_original = coluna_campanha
-    
-    # Renomear colunas de forma segura
-    novos_nomes = {}
-    for col in df_camp.columns:
-        if col == nome_coluna_campanha_original:
-            novos_nomes[col] = 'Campanha'
-        elif col == 'is_concluida':
-            novos_nomes[col] = 'Total Concluídas'
-        elif col == 'ID' or (isinstance(col, str) and col == primeira_coluna):
-            novos_nomes[col] = 'Total Demandas'
-        elif isinstance(col, tuple):
-            if col[0] == 'Data de Solicitação' and col[1] == 'min':
-                novos_nomes[col] = 'Data Início'
-            elif col[0] == 'Data de Solicitação' and col[1] == 'max':
-                novos_nomes[col] = 'Data Fim'
-        elif col == 'Solicitante':
-            novos_nomes[col] = 'Solicitantes'
-        elif col == 'Tipo':
-            novos_nomes[col] = 'Tipos'
-    
-    # Aplicar renomeação
-    if novos_nomes:
-        df_camp.rename(columns=novos_nomes, inplace=True)
-    
-    # DEBUG: Mostrar colunas após renomeação
-    if st.session_state.get('debug_mode', False):
-        st.sidebar.write("Colunas após renomeação:", df_camp.columns.tolist())
-    
-    # Verificar se a coluna 'Campanha' existe, se não, criar a partir do índice
-    if 'Campanha' not in df_camp.columns:
-        # Tentar encontrar a coluna que pode ser a campanha
-        for col in df_camp.columns:
-            if col == nome_coluna_campanha_original or 'campanha' in str(col).lower():
-                df_camp.rename(columns={col: 'Campanha'}, inplace=True)
-                break
+    # =========================================================
+    # PREPARAR DADOS AGREGADOS POR CAMPANHA
+    # =========================================================
+    with st.spinner("🔄 Agregando dados por campanha..."):
+        # Filtrar apenas linhas com campanha válida
+        df_camp_valid = df_filtrado[df_filtrado[coluna_campanha].notna() & (df_filtrado[coluna_campanha] != '')]
+        
+        if df_camp_valid.empty:
+            st.warning("⚠️ Nenhuma campanha encontrada com os filtros atuais")
+            st.stop()
+        
+        # Construir dicionário de agregação dinamicamente
+        agg_dict = {}
+        
+        # ID (sempre contar)
+        if 'ID' in df_camp_valid.columns:
+            agg_dict['ID'] = 'count'
         else:
-            # Se ainda não encontrou, usar o índice como fallback
-            st.warning("⚠️ Coluna de campanha não encontrada, usando índice como identificador")
-            df_camp['Campanha'] = f"Campanha {df_camp.index + 1}"
-    
-    # Verificar se 'Total Demandas' existe
-    if 'Total Demandas' not in df_camp.columns:
-        # Tentar encontrar uma coluna de contagem
-        for col in df_camp.columns:
-            if col != 'Campanha' and col != 'Total Concluídas' and col not in ['Data Início', 'Data Fim', 'Solicitantes', 'Tipos', 'Período']:
-                if pd.api.types.is_numeric_dtype(df_camp[col]):
-                    df_camp['Total Demandas'] = df_camp[col]
-                    break
+            # Usar qualquer coluna para contar
+            primeira_coluna = df_camp_valid.columns[0]
+            agg_dict[primeira_coluna] = 'count'
+        
+        # Status
+        if 'Status' in df_camp_valid.columns:
+            agg_dict['Status'] = lambda x: list(x.unique())
+        
+        # Data de Solicitação
+        if 'Data de Solicitação' in df_camp_valid.columns:
+            agg_dict['Data de Solicitação'] = ['min', 'max']
+        
+        # Data de Entrega
+        if 'Data de Entrega' in df_camp_valid.columns:
+            agg_dict['Data de Entrega'] = lambda x: x.count()
+        
+        # Solicitante
+        if 'Solicitante' in df_camp_valid.columns:
+            agg_dict['Solicitante'] = lambda x: list(x.unique())[:3]
+        
+        # Tipo
+        if 'Tipo' in df_camp_valid.columns:
+            agg_dict['Tipo'] = lambda x: list(x.unique())
+        
+        # Executar agregação
+        df_camp = df_camp_valid.groupby(coluna_campanha).agg(agg_dict).reset_index()
+        
+        # Renomear colunas de forma segura
+        column_names = ['Campanha']
+        
+        for col in agg_dict.keys():
+            if col == 'ID' or col == df_camp_valid.columns[0]:
+                column_names.append('Total Demandas')
+            elif col == 'Status':
+                column_names.append('Status')
+            elif col == 'Data de Solicitação':
+                column_names.extend(['Data Início', 'Data Fim'])
+            elif col == 'Data de Entrega':
+                column_names.append('Total Entregues')
+            elif col == 'Solicitante':
+                column_names.append('Solicitantes')
+            elif col == 'Tipo':
+                column_names.append('Tipos')
+            else:
+                column_names.append(col)
+        
+        # Ajustar se tiver número diferente de colunas
+        if len(column_names) == len(df_camp.columns):
+            df_camp.columns = column_names
         else:
+            # Fallback: usar nomes genéricos
+            df_camp.columns = ['Campanha'] + [f'Col_{i}' for i in range(1, len(df_camp.columns))]
+        
+        # Garantir colunas essenciais
+        if 'Total Demandas' not in df_camp.columns:
             df_camp['Total Demandas'] = 1
-    
-    if 'Total Concluídas' not in df_camp.columns:
-        df_camp['Total Concluídas'] = 0
-    
-    # Calcular taxa de conclusão
-    df_camp['Taxa Conclusão'] = (df_camp['Total Concluídas'] / df_camp['Total Demandas'] * 100).round(1)
-    
-    # Criar período se tiver datas
-    if 'Data Início' in df_camp.columns and 'Data Fim' in df_camp.columns:
-        try:
-            if not pd.api.types.is_datetime64_any_dtype(df_camp['Data Início']):
-                df_camp['Data Início'] = pd.to_datetime(df_camp['Data Início'])
-            if not pd.api.types.is_datetime64_any_dtype(df_camp['Data Fim']):
-                df_camp['Data Fim'] = pd.to_datetime(df_camp['Data Fim'])
-            
+        
+        if 'Total Entregues' not in df_camp.columns:
+            df_camp['Total Entregues'] = 0
+        
+        # Calcular taxa de conclusão
+        df_camp['Taxa Conclusão'] = (df_camp['Total Entregues'] / df_camp['Total Demandas'] * 100).round(1)
+        
+        # Criar período se tiver datas
+        if 'Data Início' in df_camp.columns and 'Data Fim' in df_camp.columns:
             df_camp['Período'] = df_camp['Data Início'].dt.strftime('%d/%m') + " a " + df_camp['Data Fim'].dt.strftime('%d/%m/%Y')
-        except:
-            df_camp['Período'] = "Período indisponível"
-    else:
-        df_camp['Período'] = "Não disponível"
+        else:
+            df_camp['Período'] = "Não disponível"
+        
+        # Ordenar por total de demandas
+        df_camp = df_camp.sort_values('Total Demandas', ascending=False).reset_index(drop=True)
     
-    # Ordenar por total de demandas
-    df_camp = df_camp.sort_values('Total Demandas', ascending=False).reset_index(drop=True)
+    # =========================================================
+    # SELETOR DE CAMPANHA
+    # =========================================================
+    st.markdown("### 🎯 Selecionar Demanda")
     
-    # Mostrar preview no debug mode
-    if st.session_state.get('debug_mode', False):
-        with st.expander("🔍 Preview dos dados agregados"):
-            st.write("Colunas disponíveis:", df_camp.columns.tolist())
-            st.dataframe(df_camp.head(), use_container_width=True)
-
-# =========================================================
-# SELETOR DE CAMPANHA (CORRIGIDO)
-# =========================================================
-st.markdown("### 🎯 Selecionar Demanda")
-
-col_sel1, col_sel2 = st.columns([3, 1])
-
-with col_sel1:
-    # Verificar se a coluna Campanha existe antes de usar
-    if 'Campanha' in df_camp.columns:
+    col_sel1, col_sel2 = st.columns([3, 1])
+    
+    with col_sel1:
+        # Lista de campanhas (incluindo opção "Todas")
         campanhas_lista = ['Todas'] + df_camp['Campanha'].tolist()
-    else:
-        # Fallback: usar o índice
-        st.warning("⚠️ Coluna 'Campanha' não encontrada, usando índice")
-        campanhas_lista = ['Todas'] + [f"Campanha {i+1}" for i in range(len(df_camp))]
+        campanha_selecionada = st.selectbox(
+            "Escolha uma campanha para ver detalhes:",
+            options=campanhas_lista,
+            index=0,
+            key="seletor_campanha"
+        )
     
-    campanha_selecionada = st.selectbox(
-        "Escolha uma campanha para ver detalhes:",
-        options=campanhas_lista,
-        index=0,
-        key="seletor_campanha"
-    )
+    with col_sel2:
+        st.markdown("<br>", unsafe_allow_html=True)
+        if st.button("🔄 Limpar seleção", use_container_width=True):
+            st.session_state.seletor_campanha = 'Todas'
+            st.rerun()
     
     # =========================================================
     # MÉTRICAS DA CAMPANHA SELECIONADA (SEM TAXA)
