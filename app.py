@@ -2428,8 +2428,8 @@ with tab4:
     if filtros_ativos_tab4:
         st.info(f"🔍 **Filtros ativos:** {total_filtrado} de {len(df)} registros ({total_filtrado/len(df)*100:.1f}%)")
     
-    # =========================================================
-# PREPARAR DADOS AGREGADOS POR CAMPANHA (CORRIGIDO - SEM ERROS)
+# =========================================================
+# PREPARAR DADOS AGREGADOS POR CAMPANHA (CORRIGIDO - SEM GROUPBY DESNECESSÁRIO)
 # =========================================================
 with st.spinner("🔄 Agregando dados por campanha..."):
     # Filtrar apenas linhas com campanha válida
@@ -2483,7 +2483,7 @@ with st.spinner("🔄 Agregando dados por campanha..."):
             novos_nomes[col] = 'Campanha'
         elif col == 'is_concluida':
             novos_nomes[col] = 'Total Concluídas'
-        elif col == 'ID' or col == primeira_coluna:
+        elif col == 'ID' or (isinstance(col, str) and col == primeira_coluna):
             novos_nomes[col] = 'Total Demandas'
         elif isinstance(col, tuple):
             if col[0] == 'Data de Solicitação' and col[1] == 'min':
@@ -2498,10 +2498,12 @@ with st.spinner("🔄 Agregando dados por campanha..."):
     # Aplicar renomeação
     df_camp.rename(columns=novos_nomes, inplace=True)
     
-    # Garantir que as colunas essenciais existam
+    # REMOVIDO: O groupby desnecessário que estava causando erro
+    # O 'Total Demandas' já deve existir da agregação
+    
+    # Verificar se 'Total Demandas' existe, se não, criar com valores 1
     if 'Total Demandas' not in df_camp.columns:
-        # Se não conseguiu criar, usar o tamanho do grupo
-        df_camp['Total Demandas'] = df_camp.groupby('Campanha').size().values
+        df_camp['Total Demandas'] = 1
     
     if 'Total Concluídas' not in df_camp.columns:
         df_camp['Total Concluídas'] = 0
@@ -2512,17 +2514,26 @@ with st.spinner("🔄 Agregando dados por campanha..."):
     # Criar período se tiver datas
     if 'Data Início' in df_camp.columns and 'Data Fim' in df_camp.columns:
         # Converter para datetime se necessário
-        if not pd.api.types.is_datetime64_any_dtype(df_camp['Data Início']):
-            df_camp['Data Início'] = pd.to_datetime(df_camp['Data Início'])
-        if not pd.api.types.is_datetime64_any_dtype(df_camp['Data Fim']):
-            df_camp['Data Fim'] = pd.to_datetime(df_camp['Data Fim'])
-        
-        df_camp['Período'] = df_camp['Data Início'].dt.strftime('%d/%m') + " a " + df_camp['Data Fim'].dt.strftime('%d/%m/%Y')
+        try:
+            if not pd.api.types.is_datetime64_any_dtype(df_camp['Data Início']):
+                df_camp['Data Início'] = pd.to_datetime(df_camp['Data Início'])
+            if not pd.api.types.is_datetime64_any_dtype(df_camp['Data Fim']):
+                df_camp['Data Fim'] = pd.to_datetime(df_camp['Data Fim'])
+            
+            df_camp['Período'] = df_camp['Data Início'].dt.strftime('%d/%m') + " a " + df_camp['Data Fim'].dt.strftime('%d/%m/%Y')
+        except:
+            df_camp['Período'] = "Período indisponível"
     else:
         df_camp['Período'] = "Não disponível"
     
     # Ordenar por total de demandas
     df_camp = df_camp.sort_values('Total Demandas', ascending=False).reset_index(drop=True)
+    
+    # Mostrar preview no debug mode
+    if st.session_state.get('debug_mode', False):
+        with st.expander("🔍 Preview dos dados agregados"):
+            st.write("Colunas disponíveis:", df_camp.columns.tolist())
+            st.dataframe(df_camp.head(), use_container_width=True)
     
     # =========================================================
     # SELETOR DE CAMPANHA
