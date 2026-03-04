@@ -2615,11 +2615,11 @@ with tab4:
                 st.caption(row['Período'])
             with cols[2]:
                 st.markdown(f"**{int(row['Total Demandas'])}**")
-            with cols[3]:
-                st.markdown(
-                    f"**{row['Taxa Conclusão']}%**",
-                    help="Taxa calculada com base em demandas com status 'Concluído' ou 'Aprovado'"
-                )
+            # with cols[3]:
+            #     st.markdown(
+            #         f"**{row['Taxa Conclusão']}%**",
+            #         help="Taxa calculada com base em demandas com status 'Concluído' ou 'Aprovado'"
+            #     )
             with cols[4]:
                 if 'Solicitantes' in row:
                     st.markdown(f"_{row['Solicitantes']}_")
