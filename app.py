@@ -2429,7 +2429,7 @@ with tab4:
         st.info(f"🔍 **Filtros ativos:** {total_filtrado} de {len(df)} registros ({total_filtrado/len(df)*100:.1f}%)")
     
 # =========================================================
-# PREPARAR DADOS AGREGADOS POR CAMPANHA (CORRIGIDO - SEM GROUPBY DESNECESSÁRIO)
+# PREPARAR DADOS AGREGADOS POR CAMPANHA (CORRIGIDO - NOMES DE COLUNAS)
 # =========================================================
 with st.spinner("🔄 Agregando dados por campanha..."):
     # Filtrar apenas linhas com campanha válida
@@ -2476,10 +2476,13 @@ with st.spinner("🔄 Agregando dados por campanha..."):
     # Executar agregação
     df_camp = df_agg.groupby(coluna_campanha).agg(agg_dict).reset_index()
     
+    # IMPORTANTE: Guardar o nome original da coluna de campanha
+    nome_coluna_campanha_original = coluna_campanha
+    
     # Renomear colunas de forma segura
     novos_nomes = {}
     for col in df_camp.columns:
-        if col == coluna_campanha:
+        if col == nome_coluna_campanha_original:
             novos_nomes[col] = 'Campanha'
         elif col == 'is_concluida':
             novos_nomes[col] = 'Total Concluídas'
@@ -2496,14 +2499,35 @@ with st.spinner("🔄 Agregando dados por campanha..."):
             novos_nomes[col] = 'Tipos'
     
     # Aplicar renomeação
-    df_camp.rename(columns=novos_nomes, inplace=True)
+    if novos_nomes:
+        df_camp.rename(columns=novos_nomes, inplace=True)
     
-    # REMOVIDO: O groupby desnecessário que estava causando erro
-    # O 'Total Demandas' já deve existir da agregação
+    # DEBUG: Mostrar colunas após renomeação
+    if st.session_state.get('debug_mode', False):
+        st.sidebar.write("Colunas após renomeação:", df_camp.columns.tolist())
     
-    # Verificar se 'Total Demandas' existe, se não, criar com valores 1
+    # Verificar se a coluna 'Campanha' existe, se não, criar a partir do índice
+    if 'Campanha' not in df_camp.columns:
+        # Tentar encontrar a coluna que pode ser a campanha
+        for col in df_camp.columns:
+            if col == nome_coluna_campanha_original or 'campanha' in str(col).lower():
+                df_camp.rename(columns={col: 'Campanha'}, inplace=True)
+                break
+        else:
+            # Se ainda não encontrou, usar o índice como fallback
+            st.warning("⚠️ Coluna de campanha não encontrada, usando índice como identificador")
+            df_camp['Campanha'] = f"Campanha {df_camp.index + 1}"
+    
+    # Verificar se 'Total Demandas' existe
     if 'Total Demandas' not in df_camp.columns:
-        df_camp['Total Demandas'] = 1
+        # Tentar encontrar uma coluna de contagem
+        for col in df_camp.columns:
+            if col != 'Campanha' and col != 'Total Concluídas' and col not in ['Data Início', 'Data Fim', 'Solicitantes', 'Tipos', 'Período']:
+                if pd.api.types.is_numeric_dtype(df_camp[col]):
+                    df_camp['Total Demandas'] = df_camp[col]
+                    break
+        else:
+            df_camp['Total Demandas'] = 1
     
     if 'Total Concluídas' not in df_camp.columns:
         df_camp['Total Concluídas'] = 0
@@ -2513,7 +2537,6 @@ with st.spinner("🔄 Agregando dados por campanha..."):
     
     # Criar período se tiver datas
     if 'Data Início' in df_camp.columns and 'Data Fim' in df_camp.columns:
-        # Converter para datetime se necessário
         try:
             if not pd.api.types.is_datetime64_any_dtype(df_camp['Data Início']):
                 df_camp['Data Início'] = pd.to_datetime(df_camp['Data Início'])
@@ -2534,29 +2557,29 @@ with st.spinner("🔄 Agregando dados por campanha..."):
         with st.expander("🔍 Preview dos dados agregados"):
             st.write("Colunas disponíveis:", df_camp.columns.tolist())
             st.dataframe(df_camp.head(), use_container_width=True)
-    
-    # =========================================================
-    # SELETOR DE CAMPANHA
-    # =========================================================
-    st.markdown("### 🎯 Selecionar Demanda")
-    
-    col_sel1, col_sel2 = st.columns([3, 1])
-    
-    with col_sel1:
-        # Lista de campanhas (incluindo opção "Todas")
+
+# =========================================================
+# SELETOR DE CAMPANHA (CORRIGIDO)
+# =========================================================
+st.markdown("### 🎯 Selecionar Demanda")
+
+col_sel1, col_sel2 = st.columns([3, 1])
+
+with col_sel1:
+    # Verificar se a coluna Campanha existe antes de usar
+    if 'Campanha' in df_camp.columns:
         campanhas_lista = ['Todas'] + df_camp['Campanha'].tolist()
-        campanha_selecionada = st.selectbox(
-            "Escolha uma campanha para ver detalhes:",
-            options=campanhas_lista,
-            index=0,
-            key="seletor_campanha"
-        )
+    else:
+        # Fallback: usar o índice
+        st.warning("⚠️ Coluna 'Campanha' não encontrada, usando índice")
+        campanhas_lista = ['Todas'] + [f"Campanha {i+1}" for i in range(len(df_camp))]
     
-    with col_sel2:
-        st.markdown("<br>", unsafe_allow_html=True)
-        if st.button("🔄 Limpar seleção", use_container_width=True):
-            st.session_state.seletor_campanha = 'Todas'
-            st.rerun()
+    campanha_selecionada = st.selectbox(
+        "Escolha uma campanha para ver detalhes:",
+        options=campanhas_lista,
+        index=0,
+        key="seletor_campanha"
+    )
     
     # =========================================================
     # MÉTRICAS DA CAMPANHA SELECIONADA (SEM TAXA)
