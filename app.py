@@ -2580,29 +2580,110 @@ with tab4:
         
         st.divider()
     
-    # =========================================================
-    # LISTA DE CAMPANHAS - VERSÃO SIMPLIFICADA (SEM %)
+        # =========================================================
+    # LISTA DE CAMPANHAS - VERSÃO CORRIGIDA
     # =========================================================
     st.markdown("### 📋 Lista de Campanhas")
     
-    # Filtrar tabela se uma campanha específica foi selecionada
-    if campanha_selecionada != 'Todas' and 'Campanha' in df_camp.columns:
-        df_tabela_exibicao = df_camp[df_camp['Campanha'] == campanha_selecionada].copy()
-        st.info(f"📌 Mostrando apenas: {campanha_selecionada}")
+    # Determinar qual dataframe usar baseado na seleção
+    if campanha_selecionada != 'Todas':
+        # Filtrar apenas a campanha selecionada
+        if 'Campanha' in df_camp.columns:
+            df_exibicao = df_camp[df_camp['Campanha'] == campanha_selecionada].copy()
+            if not df_exibicao.empty:
+                st.info(f"📌 Mostrando apenas: {campanha_selecionada}")
+            else:
+                st.warning(f"⚠️ Campanha '{campanha_selecionada}' não encontrada")
+                df_exibicao = df_camp.copy()
+        else:
+            df_exibicao = df_camp.copy()
     else:
-        df_tabela_exibicao = df_camp.copy()
-    
-    # Métricas resumidas
-    if campanha_selecionada == 'Todas':
+        df_exibicao = df_camp.copy()
+        # Métricas resumidas apenas quando mostra todas
         col_res1, col_res2 = st.columns(2)
         with col_res1:
-            st.metric("Total de Campanhas", len(df_tabela_exibicao))
+            st.metric("Total de Campanhas", len(df_exibicao))
         with col_res2:
-            if 'Total Demandas' in df_tabela_exibicao.columns:
-                total_demandas = int(df_tabela_exibicao['Total Demandas'].sum())
+            if 'Total Demandas' in df_exibicao.columns:
+                total_demandas = int(df_exibicao['Total Demandas'].sum())
                 st.metric("Total Demandas", total_demandas)
         
         st.divider()
+    
+    # Verificar se há dados para exibir
+    if df_exibicao.empty:
+        st.warning("⚠️ Nenhuma campanha encontrada com os filtros atuais")
+    else:
+        # Tabela interativa
+        for idx, row in df_exibicao.iterrows():
+            with st.container():
+                # Mostrar apenas 3 colunas: Campanha, Período e Total Demandas
+                col1, col2, col3 = st.columns([3, 2, 1])
+                
+                with col1:
+                    # Garantir que o nome da campanha seja mostrado
+                    if 'Campanha' in row and pd.notna(row['Campanha']):
+                        nome_campanha = str(row['Campanha'])
+                    else:
+                        nome_campanha = f"Campanha {idx+1}"
+                    st.markdown(f"**{nome_campanha}**")
+                
+                with col2:
+                    if 'Período' in row and pd.notna(row['Período']):
+                        periodo = str(row['Período'])
+                    else:
+                        periodo = "Período não disponível"
+                    st.caption(periodo)
+                
+                with col3:
+                    if 'Total Demandas' in row and pd.notna(row['Total Demandas']):
+                        total = int(row['Total Demandas'])
+                    else:
+                        total = 0
+                    st.markdown(f"**{total}**")
+                
+                # Expansor com detalhes
+                with st.expander(f"📌 Ver demandas desta campanha"):
+                    # Filtrar demandas da campanha atual
+                    if 'Campanha' in df_camp_valid.columns:
+                        demandas_campanha = df_camp_valid[df_camp_valid['Campanha'] == nome_campanha]
+                    else:
+                        demandas_campanha = df_camp_valid[df_camp_valid[coluna_campanha] == nome_campanha]
+                    
+                    if not demandas_campanha.empty:
+                        # Métricas dentro do expansor
+                        col_d1, col_d2, col_d3 = st.columns(3)
+                        with col_d1:
+                            st.metric("Total", len(demandas_campanha))
+                        with col_d2:
+                            if 'Status' in demandas_campanha.columns:
+                                conc = len(demandas_campanha[demandas_campanha['Status'].str.contains('Concluído|Aprovado', na=False, case=False)])
+                                st.metric("Concluídas", conc)
+                            else:
+                                st.metric("Concluídas", "N/A")
+                        with col_d3:
+                            if 'Status' in demandas_campanha.columns and len(demandas_campanha) > 0:
+                                conc = len(demandas_campanha[demandas_campanha['Status'].str.contains('Concluído|Aprovado', na=False, case=False)])
+                                st.metric("Taxa", f"{conc/len(demandas_campanha)*100:.1f}%")
+                            else:
+                                st.metric("Taxa", "N/A")
+                        
+                        # Tabela de demandas
+                        cols_mostrar = []
+                        for col in ['ID', 'Status', 'Data de Solicitação', 'Tipo']:
+                            if col in demandas_campanha.columns:
+                                cols_mostrar.append(col)
+                        
+                        if cols_mostrar:
+                            st.dataframe(
+                                demandas_campanha[cols_mostrar],
+                                use_container_width=True,
+                                hide_index=True
+                            )
+                    else:
+                        st.info("ℹ️ Nenhuma demanda encontrada para esta campanha")
+                
+                st.divider()
     
     # =========================================================
     # TABELA INTERATIVA - SIMPLIFICADA (APENAS 3 COLUNAS)
