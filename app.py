@@ -2819,7 +2819,7 @@ with tab4:
                     
                     st.markdown(f"**{total}**")
                 
-                # Expansor com detalhes (aqui dentro continua tendo todas as informações)
+                                # Expansor com detalhes (com Demanda de Comunicação)
                 with st.expander(f"📌 Ver demandas desta campanha"):
                     # Filtrar demandas da campanha atual
                     if not df_camp_valid.empty:
@@ -2856,7 +2856,7 @@ with tab4:
                                 else:
                                     st.metric("Taxa", "N/A")
                             
-                            # TABELA DE DEMANDAS
+                            # TABELA DE DEMANDAS COM DEMANDA DE COMUNICAÇÃO
                             st.markdown("##### 📋 Detalhamento das Demandas")
                             
                             # Lista de colunas para exibir na tabela
@@ -2880,10 +2880,33 @@ with tab4:
                                         cols_tabela.append(col)
                                         break
                             
+                            # DEMANDA DE COMUNICAÇÃO - AGORA INCLUÍDA
+                            # Procurar por coluna de demanda de comunicação
+                            coluna_demanda_encontrada = None
+                            for col in demandas.columns:
+                                if 'demanda' in col.lower() or 'comunicação' in col.lower() or 'comunicacao' in col.lower():
+                                    coluna_demanda_encontrada = col
+                                    break
+                            
+                            if coluna_demanda_encontrada:
+                                cols_tabela.append(coluna_demanda_encontrada)
+                            
                             # Outras colunas relevantes
                             for col in ['Tipo', 'Tipo Atividade', 'Peça', 'Solicitante', 'Produção']:
                                 if col in demandas.columns and col not in cols_tabela:
                                     cols_tabela.append(col)
+                            
+                            # Se não encontrou nenhuma coluna específica de demanda, 
+                            # tentar adicionar qualquer coluna de texto que possa ser relevante
+                            if coluna_demanda_encontrada is None:
+                                for col in demandas.columns:
+                                    if col not in cols_tabela and col not in ['ID', 'Status', 'Prioridade', 'Data de Solicitação', 'Deadline']:
+                                        if demandas[col].dtype == 'object':  # Colunas de texto
+                                            # Verificar se parece ser uma descrição ou demanda
+                                            nome_col = col.lower()
+                                            if 'descrição' in nome_col or 'descricao' in nome_col or 'observação' in nome_col or 'observacao' in nome_col or 'comunic' in nome_col:
+                                                cols_tabela.append(col)
+                                                break
                             
                             # Criar uma cópia para formatação
                             df_display = demandas[cols_tabela].copy() if cols_tabela else demandas.copy()
@@ -2907,8 +2930,6 @@ with tab4:
                             st.info("ℹ️ Nenhuma demanda encontrada para esta campanha")
                     else:
                         st.info("ℹ️ Dados de demanda não disponíveis")
-                
-                st.divider()
 
 # =========================================================
 # EXPORTAÇÃO (FORA DAS TABS)
