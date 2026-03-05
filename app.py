@@ -466,7 +466,7 @@ tab1, tab2, tab3, tab4 = st.tabs([
     "📈 Análise Estratégica",
     "🎯 KPIs COCRED",
     "📋 Explorador de Dados",
-    "📊 Análise Comparativa de Campanhas"  # NOVA TAB
+    "📊 Análise detalhada de demandas"  # NOVA TAB
 ])
 
 # =========================================================
