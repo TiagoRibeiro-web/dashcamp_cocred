@@ -2428,8 +2428,8 @@ with tab4:
     if filtros_ativos_tab4:
         st.info(f"🔍 **Filtros ativos:** {total_filtrado} de {len(df)} registros ({total_filtrado/len(df)*100:.1f}%)")
     
-        # =========================================================
-    # PREPARAR DADOS AGREGADOS POR CAMPANHA (CORRIGIDO)
+    # =========================================================
+    # PREPARAR DADOS AGREGADOS POR CAMPANHA (CORRIGIDO - COM PERÍODO E DEADLINE)
     # =========================================================
     with st.spinner("🔄 Agregando dados por campanha..."):
         # Filtrar apenas linhas com campanha válida
@@ -2448,7 +2448,7 @@ with tab4:
         else:
             df_agg['is_concluida'] = 0
         
-        # Agregar tudo de uma vez
+        # Dicionário de agregação
         agg_dict = {
             'is_concluida': 'sum',  # Soma das concluídas
         }
@@ -2457,19 +2457,44 @@ with tab4:
         if 'ID' in df_agg.columns:
             agg_dict['ID'] = 'count'
         else:
-            # Usar a primeira coluna disponível para contar
             primeira_coluna = df_agg.columns[0]
             agg_dict[primeira_coluna] = 'count'
         
-        # Adicionar datas se disponíveis
+        # Adicionar datas de solicitação (min e max) - para o período
         if 'Data de Solicitação' in df_agg.columns:
             agg_dict['Data de Solicitação'] = ['min', 'max']
         
-        # Adicionar solicitantes (como lista dos únicos)
+        # Adicionar DEADLINE - importante! Precisamos capturar a deadline
+        # Vamos procurar a coluna de deadline
+        coluna_deadline = None
+        for col in df_agg.columns:
+            if 'deadline' in col.lower() or 'prazo' in col.lower():
+                coluna_deadline = col
+                break
+        
+        if coluna_deadline is None and 'Deadline' in df_agg.columns:
+            coluna_deadline = 'Deadline'
+        
+        if coluna_deadline:
+            # Para deadline, vamos pegar a data mais comum ou a máxima
+            agg_dict[coluna_deadline] = 'max'  # Pega a deadline mais distante
+        
+        # Adicionar DEMANDA DE COMUNICAÇÃO
+        coluna_demanda = None
+        for col in df_agg.columns:
+            if 'demanda' in col.lower() or 'comunicação' in col.lower() or 'comunicacao' in col.lower():
+                coluna_demanda = col
+                break
+        
+        if coluna_demanda:
+            # Para demanda, vamos pegar o valor mais comum
+            agg_dict[coluna_demanda] = lambda x: x.mode()[0] if not x.mode().empty else x.iloc[0]
+        
+        # Adicionar solicitantes
         if 'Solicitante' in df_agg.columns:
             agg_dict['Solicitante'] = lambda x: list(x.dropna().unique())[:3]
         
-        # Adicionar tipos (como lista dos únicos)
+        # Adicionar tipos
         if 'Tipo' in df_agg.columns:
             agg_dict['Tipo'] = lambda x: list(x.dropna().unique())
         
@@ -2481,7 +2506,6 @@ with tab4:
         
         # Renomear colunas de forma segura
         novos_nomes = {}
-        colunas_para_remover = []
         
         for col in df_camp.columns:
             # Se for uma tupla, o primeiro elemento é o nome original
@@ -2489,17 +2513,21 @@ with tab4:
                 nome_original = col[0]
                 if nome_original == coluna_campanha or 'campanha' in str(nome_original).lower():
                     novos_nomes[col] = 'Campanha'
-                elif col[0] == 'is_concluida':
+                elif nome_original == 'is_concluida':
                     novos_nomes[col] = 'Total Concluídas'
-                elif col[0] == 'ID' or (isinstance(col[0], str) and col[0] == primeira_coluna):
+                elif nome_original == 'ID' or (isinstance(nome_original, str) and nome_original == primeira_coluna):
                     novos_nomes[col] = 'Total Demandas'
-                elif col[0] == 'Data de Solicitação' and col[1] == 'min':
+                elif nome_original == 'Data de Solicitação' and col[1] == 'min':
                     novos_nomes[col] = 'Data Início'
-                elif col[0] == 'Data de Solicitação' and col[1] == 'max':
+                elif nome_original == 'Data de Solicitação' and col[1] == 'max':
                     novos_nomes[col] = 'Data Fim'
-                elif col[0] == 'Solicitante':
+                elif nome_original == coluna_deadline:
+                    novos_nomes[col] = 'Deadline'
+                elif nome_original == coluna_demanda:
+                    novos_nomes[col] = 'Demanda de Comunicação'
+                elif nome_original == 'Solicitante':
                     novos_nomes[col] = 'Solicitantes'
-                elif col[0] == 'Tipo':
+                elif nome_original == 'Tipo':
                     novos_nomes[col] = 'Tipos'
             else:
                 # Se não for tupla, é uma coluna simples
@@ -2509,6 +2537,10 @@ with tab4:
                     novos_nomes[col] = 'Total Concluídas'
                 elif col == 'ID' or col == primeira_coluna:
                     novos_nomes[col] = 'Total Demandas'
+                elif col == coluna_deadline:
+                    novos_nomes[col] = 'Deadline'
+                elif col == coluna_demanda:
+                    novos_nomes[col] = 'Demanda de Comunicação'
                 elif col == 'Solicitante':
                     novos_nomes[col] = 'Solicitantes'
                 elif col == 'Tipo':
@@ -2518,42 +2550,65 @@ with tab4:
         if novos_nomes:
             df_camp.rename(columns=novos_nomes, inplace=True)
         
-        # Verificar se a coluna 'Campanha' existe, se não, criar a partir dos dados
+        # Verificar se a coluna 'Campanha' existe
         if 'Campanha' not in df_camp.columns:
-            # Tentar encontrar qualquer coluna que contenha 'campanha' no nome
             for col in df_camp.columns:
                 if 'campanha' in str(col).lower():
                     df_camp['Campanha'] = df_camp[col]
                     break
             else:
-                # Se não encontrar, usar o índice
-                st.warning("⚠️ Coluna de campanha não encontrada, usando índice como identificador")
                 df_camp['Campanha'] = [f"Campanha {i+1}" for i in range(len(df_camp))]
         
         # Garantir que 'Total Demandas' existe
         if 'Total Demandas' not in df_camp.columns:
-            # Tentar encontrar uma coluna numérica para usar como total
             for col in df_camp.columns:
-                if col != 'Campanha' and col not in ['Data Início', 'Data Fim', 'Solicitantes', 'Tipos', 'Período']:
+                if col != 'Campanha' and col not in ['Data Início', 'Data Fim', 'Solicitantes', 'Tipos', 'Período', 'Deadline', 'Demanda de Comunicação']:
                     if pd.api.types.is_numeric_dtype(df_camp[col]):
                         df_camp['Total Demandas'] = df_camp[col]
                         break
             else:
                 df_camp['Total Demandas'] = 1
         
-        # Criar período se tiver datas
+        # CRIAR PERÍODO a partir das datas de início e fim
         if 'Data Início' in df_camp.columns and 'Data Fim' in df_camp.columns:
             try:
+                # Garantir que são datetime
                 if not pd.api.types.is_datetime64_any_dtype(df_camp['Data Início']):
                     df_camp['Data Início'] = pd.to_datetime(df_camp['Data Início'])
                 if not pd.api.types.is_datetime64_any_dtype(df_camp['Data Fim']):
                     df_camp['Data Fim'] = pd.to_datetime(df_camp['Data Fim'])
                 
+                # Formatar o período
                 df_camp['Período'] = df_camp['Data Início'].dt.strftime('%d/%m') + " a " + df_camp['Data Fim'].dt.strftime('%d/%m/%Y')
-            except:
+            except Exception as e:
                 df_camp['Período'] = "Período indisponível"
+                if st.session_state.get('debug_mode', False):
+                    st.caption(f"Erro ao criar período: {e}")
         else:
-            df_camp['Período'] = "Não disponível"
+            df_camp['Período'] = "Período não disponível"
+        
+        # FORMATAR DEADLINE
+        if 'Deadline' in df_camp.columns:
+            try:
+                # Converter para datetime se necessário
+                if not pd.api.types.is_datetime64_any_dtype(df_camp['Deadline']):
+                    df_camp['Deadline'] = pd.to_datetime(df_camp['Deadline'])
+                
+                # Formatar a data
+                df_camp['Deadline'] = df_camp['Deadline'].dt.strftime('%d/%m/%Y')
+            except Exception as e:
+                # Se não conseguir converter, manter como está mas garantir que é string
+                df_camp['Deadline'] = df_camp['Deadline'].astype(str)
+                if st.session_state.get('debug_mode', False):
+                    st.caption(f"Erro ao formatar deadline: {e}")
+        
+        # FORMATAR DEMANDA DE COMUNICAÇÃO
+        if 'Demanda de Comunicação' in df_camp.columns:
+            # Garantir que é string
+            df_camp['Demanda de Comunicação'] = df_camp['Demanda de Comunicação'].astype(str)
+            # Remover 'nan' se houver
+            df_camp['Demanda de Comunicação'] = df_camp['Demanda de Comunicação'].replace('nan', 'N/A')
+            df_camp['Demanda de Comunicação'] = df_camp['Demanda de Comunicação'].replace('None', 'N/A')
         
         # Ordenar por total de demandas
         df_camp = df_camp.sort_values('Total Demandas', ascending=False).reset_index(drop=True)
@@ -2563,16 +2618,7 @@ with tab4:
             with st.expander("🔍 Dados processados das campanhas"):
                 st.write("Colunas finais:", df_camp.columns.tolist())
                 st.write("Primeiras linhas:")
-                st.dataframe(df_camp[['Campanha', 'Total Demandas']].head())
-    # =========================================================
-    # DEBUG: Verificar dados da campanha
-    # =========================================================
-        if st.session_state.get('debug_mode', False):
-            with st.expander("🔍 Dados brutos das campanhas (DEBUG)"):
-                st.write("Colunas disponíveis:", df_camp.columns.tolist())
-                st.write("Primeiras 5 linhas:")
-                st.dataframe(df_camp[['Campanha', 'Total Demandas']].head() if 'Campanha' in df_camp.columns else df_camp.head())
-                st.write("Valores únicos na coluna Campanha:", df_camp['Campanha'].unique()[:10] if 'Campanha' in df_camp.columns else "Coluna não encontrada")
+                st.dataframe(df_camp[['Campanha', 'Período', 'Deadline', 'Demanda de Comunicação', 'Total Demandas']].head())
     # =========================================================
     # SELETOR DE CAMPANHA - CORRIGIDO COM DEBUG
     # =========================================================
