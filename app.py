@@ -2538,8 +2538,8 @@ with tab4:
         # Ordenar por total de demandas
         df_camp = df_camp.sort_values('Total Demandas', ascending=False).reset_index(drop=True)
     
-    # =========================================================
-    # SELETOR DE CAMPANHA
+        # =========================================================
+    # SELETOR DE CAMPANHA - CORRIGIDO
     # =========================================================
     st.markdown("### 🎯 Selecionar Demanda")
     
@@ -2547,9 +2547,16 @@ with tab4:
     
     with col_sel1:
         if 'Campanha' in df_camp.columns:
-            campanhas_lista = ['Todas'] + df_camp['Campanha'].tolist()
+            # Garantir que não temos valores nulos na lista
+            campanhas_validas = df_camp['Campanha'].dropna().tolist()
+            campanhas_validas = [str(c) for c in campanhas_validas if str(c).strip() != '']
+            campanhas_lista = ['Todas'] + campanhas_validas
         else:
             campanhas_lista = ['Todas'] + [f"Campanha {i+1}" for i in range(len(df_camp))]
+        
+        # Inicializar session state se não existir
+        if 'seletor_campanha' not in st.session_state:
+            st.session_state.seletor_campanha = 'Todas'
         
         campanha_selecionada = st.selectbox(
             "Escolha uma campanha para ver detalhes:",
@@ -2567,35 +2574,37 @@ with tab4:
     # =========================================================
     # MÉTRICAS DA CAMPANHA SELECIONADA
     # =========================================================
-    if campanha_selecionada != 'Todas' and 'Campanha' in df_camp.columns:
-        df_camp_sel = df_camp[df_camp['Campanha'] == campanha_selecionada].iloc[0]
+    if campanha_selecionada != 'Todas':
+        # Filtrar a campanha selecionada
+        campanha_filtrada = df_camp[df_camp['Campanha'] == campanha_selecionada]
         
-        st.markdown(f"### 📊 Detalhes: {campanha_selecionada}")
-        col_m1, col_m2 = st.columns(2)
-        
-        with col_m1:
-            st.metric("Total Demandas", int(df_camp_sel['Total Demandas']))
-        with col_m2:
-            st.metric("Período", df_camp_sel['Período'])
-        
-        st.divider()
+        if not campanha_filtrada.empty:
+            df_camp_sel = campanha_filtrada.iloc[0]
+            
+            st.markdown(f"### 📊 Detalhes: {campanha_selecionada}")
+            col_m1, col_m2 = st.columns(2)
+            
+            with col_m1:
+                if 'Total Demandas' in df_camp_sel:
+                    st.metric("Total Demandas", int(df_camp_sel['Total Demandas']))
+            with col_m2:
+                if 'Período' in df_camp_sel:
+                    st.metric("Período", df_camp_sel['Período'])
+            
+            st.divider()
     
-        # =========================================================
-    # LISTA DE CAMPANHAS - VERSÃO SIMPLIFICADA (SEM PD.ISNA)
+    # =========================================================
+    # LISTA DE CAMPANHAS - VERSÃO SIMPLIFICADA
     # =========================================================
     st.markdown("### 📋 Lista de Campanhas")
     
-    # Determinar qual dataframe usar baseado na seleção
+    # Filtrar com base na seleção
     if campanha_selecionada != 'Todas':
-        # Filtrar apenas a campanha selecionada
-        if 'Campanha' in df_camp.columns:
-            df_exibicao = df_camp[df_camp['Campanha'] == campanha_selecionada].copy()
-            if not df_exibicao.empty:
-                st.info(f"📌 Mostrando apenas: {campanha_selecionada}")
-            else:
-                st.warning(f"⚠️ Campanha '{campanha_selecionada}' não encontrada")
-                df_exibicao = df_camp.copy()
+        df_exibicao = df_camp[df_camp['Campanha'] == campanha_selecionada].copy()
+        if not df_exibicao.empty:
+            st.info(f"📌 Mostrando apenas: {campanha_selecionada}")
         else:
+            st.warning(f"⚠️ Campanha '{campanha_selecionada}' não encontrada")
             df_exibicao = df_camp.copy()
     else:
         df_exibicao = df_camp.copy()
@@ -2622,33 +2631,32 @@ with tab4:
                 col1, col2, col3 = st.columns([3, 2, 1])
                 
                 with col1:
-                    # Garantir que o nome da campanha seja mostrado
-                    nome_campanha = f"Campanha {idx+1}"  # valor padrão
+                    # Nome da campanha
+                    nome_campanha = f"Campanha {idx+1}"
                     if 'Campanha' in df_exibicao.columns:
-                        valor_campanha = row['Campanha']
-                        # Verificar se não é nulo de forma simples
-                        if valor_campanha is not None and str(valor_campanha) != 'nan' and str(valor_campanha).strip() != '':
-                            nome_campanha = str(valor_campanha)
+                        valor = row['Campanha']
+                        if valor is not None and str(valor) != 'nan' and str(valor).strip() != '':
+                            nome_campanha = str(valor)
                     st.markdown(f"**{nome_campanha}**")
                 
                 with col2:
-                    periodo = "Período não disponível"  # valor padrão
+                    # Período
+                    periodo = "Período não disponível"
                     if 'Período' in df_exibicao.columns:
-                        valor_periodo = row['Período']
-                        # Verificar se não é nulo de forma simples
-                        if valor_periodo is not None and str(valor_periodo) != 'nan' and str(valor_periodo).strip() != '':
-                            periodo = str(valor_periodo)
+                        valor = row['Período']
+                        if valor is not None and str(valor) != 'nan' and str(valor).strip() != '':
+                            periodo = str(valor)
                     st.caption(periodo)
                 
                 with col3:
-                    total = 0  # valor padrão
+                    # Total de demandas
+                    total = 0
                     if 'Total Demandas' in df_exibicao.columns:
-                        valor_total = row['Total Demandas']
-                        # Verificar se não é nulo de forma simples
-                        if valor_total is not None and str(valor_total) != 'nan':
+                        valor = row['Total Demandas']
+                        if valor is not None and str(valor) != 'nan':
                             try:
-                                total = int(float(valor_total))
-                            except (ValueError, TypeError):
+                                total = int(float(valor))
+                            except:
                                 total = 0
                     st.markdown(f"**{total}**")
                 
@@ -2656,43 +2664,34 @@ with tab4:
                 with st.expander(f"📌 Ver demandas desta campanha"):
                     # Filtrar demandas da campanha atual
                     if 'Campanha' in df_camp_valid.columns:
-                        demandas_campanha = df_camp_valid[df_camp_valid['Campanha'] == nome_campanha]
+                        demandas = df_camp_valid[df_camp_valid['Campanha'] == nome_campanha]
                     else:
-                        demandas_campanha = df_camp_valid[df_camp_valid[coluna_campanha] == nome_campanha]
+                        demandas = df_camp_valid[df_camp_valid[coluna_campanha] == nome_campanha]
                     
-                    if not demandas_campanha.empty:
-                        # Métricas dentro do expansor
-                        col_d1, col_d2, col_d3 = st.columns(3)
-                        with col_d1:
-                            st.metric("Total", len(demandas_campanha))
-                        with col_d2:
-                            if 'Status' in demandas_campanha.columns:
-                                conc = len(demandas_campanha[demandas_campanha['Status'].str.contains('Concluído|Aprovado', na=False, case=False)])
+                    if not demandas.empty:
+                        # Métricas
+                        c1, c2, c3 = st.columns(3)
+                        with c1:
+                            st.metric("Total", len(demandas))
+                        with c2:
+                            if 'Status' in demandas.columns:
+                                conc = len(demandas[demandas['Status'].str.contains('Concluído|Aprovado', na=False, case=False)])
                                 st.metric("Concluídas", conc)
-                            else:
-                                st.metric("Concluídas", "N/A")
-                        with col_d3:
-                            if 'Status' in demandas_campanha.columns and len(demandas_campanha) > 0:
-                                conc = len(demandas_campanha[demandas_campanha['Status'].str.contains('Concluído|Aprovado', na=False, case=False)])
-                                taxa = (conc / len(demandas_campanha)) * 100
-                                st.metric("Taxa", f"{taxa:.1f}%")
-                            else:
-                                st.metric("Taxa", "N/A")
+                        with c3:
+                            if 'Status' in demandas.columns and len(demandas) > 0:
+                                conc = len(demandas[demandas['Status'].str.contains('Concluído|Aprovado', na=False, case=False)])
+                                st.metric("Taxa", f"{(conc/len(demandas)*100):.1f}%")
                         
-                        # Tabela de demandas
-                        cols_mostrar = []
+                        # Tabela
+                        cols = []
                         for col in ['ID', 'Status', 'Data de Solicitação', 'Tipo']:
-                            if col in demandas_campanha.columns:
-                                cols_mostrar.append(col)
+                            if col in demandas.columns:
+                                cols.append(col)
                         
-                        if cols_mostrar:
-                            st.dataframe(
-                                demandas_campanha[cols_mostrar],
-                                use_container_width=True,
-                                hide_index=True
-                            )
+                        if cols:
+                            st.dataframe(demandas[cols], use_container_width=True, hide_index=True)
                     else:
-                        st.info("ℹ️ Nenhuma demanda encontrada para esta campanha")
+                        st.info("ℹ️ Nenhuma demanda encontrada")
                 
                 st.divider()
     
