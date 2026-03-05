@@ -2650,8 +2650,8 @@ with tab4:
             
             st.divider()
     
-    # =========================================================
-    # LISTA DE CAMPANHAS - VERSÃO FINAL CORRIGIDA
+        # =========================================================
+    # LISTA DE CAMPANHAS - COM COLUNAS DE DEADLINE E DEMANDA
     # =========================================================
     st.markdown("### 📋 Lista de Campanhas")
     
@@ -2678,7 +2678,6 @@ with tab4:
                 st.metric("Total de Campanhas", len(df_exibicao))
             with col_res2:
                 if 'Total Demandas' in df_exibicao.columns:
-                    # Garantir que a soma seja numérica
                     try:
                         total_demandas = int(df_exibicao['Total Demandas'].sum())
                         st.metric("Total Demandas", total_demandas)
@@ -2691,20 +2690,20 @@ with tab4:
     if df_exibicao.empty:
         st.warning("⚠️ Nenhuma campanha encontrada com os filtros atuais")
     else:
-        # TABELA INTERATIVA - CORRIGIDA
+        # TABELA INTERATIVA - COM 5 COLUNAS (Campanha, Período, Deadline, Demanda, Total)
         for idx, row in df_exibicao.iterrows():
             with st.container():
-                col1, col2, col3 = st.columns([3, 2, 1])
+                # Criar 5 colunas: Campanha, Período, Deadline, Demanda de Comunicação, Total
+                col1, col2, col3, col4, col5 = st.columns([3, 2, 2, 2, 1])
                 
                 with col1:
-                    # Nome da campanha - ACESSANDO O VALOR CORRETAMENTE
+                    # Nome da campanha
                     nome_campanha = f"Campanha {idx+1}"  # valor padrão
                     
                     if 'Campanha' in df_exibicao.columns:
                         valor = row['Campanha']
-                        # Verificar se é um valor válido e extrair o valor real
+                        # Extrair o valor real
                         if hasattr(valor, 'iloc') or hasattr(valor, 'values'):
-                            # Se for uma série, tentar extrair o primeiro valor
                             try:
                                 valor_real = valor.iloc[0] if hasattr(valor, 'iloc') else valor
                                 if valor_real is not None and str(valor_real).strip() != '' and str(valor_real).lower() != 'nan':
@@ -2718,8 +2717,8 @@ with tab4:
                     st.markdown(f"**{nome_campanha}**")
                 
                 with col2:
-                    # Período - ACESSANDO O VALOR CORRETAMENTE
-                    periodo = "Período não disponível"
+                    # Período
+                    periodo = "N/A"
                     
                     if 'Período' in df_exibicao.columns:
                         valor = row['Período']
@@ -2738,7 +2737,72 @@ with tab4:
                     st.caption(periodo)
                 
                 with col3:
-                    # Total de demandas - ACESSANDO O VALOR CORRETAMENTE
+                    # DEADLINE
+                    deadline = "N/A"
+                    
+                    # Procurar por coluna de deadline
+                    coluna_deadline_encontrada = None
+                    for col in df_exibicao.columns:
+                        if 'deadline' in str(col).lower() or 'prazo' in str(col).lower():
+                            coluna_deadline_encontrada = col
+                            break
+                    
+                    if coluna_deadline_encontrada:
+                        valor = row[coluna_deadline_encontrada]
+                        # Extrair o valor real
+                        if hasattr(valor, 'iloc') or hasattr(valor, 'values'):
+                            try:
+                                valor_real = valor.iloc[0] if hasattr(valor, 'iloc') else valor
+                                if valor_real is not None and str(valor_real).strip() != '' and str(valor_real).lower() != 'nan':
+                                    # Se for data, formatar
+                                    if isinstance(valor_real, (pd.Timestamp, datetime)):
+                                        deadline = valor_real.strftime('%d/%m/%Y')
+                                    else:
+                                        deadline = str(valor_real)
+                            except:
+                                deadline = str(valor)
+                        else:
+                            if valor is not None and str(valor).strip() != '' and str(valor).lower() != 'nan':
+                                if isinstance(valor, (pd.Timestamp, datetime)):
+                                    deadline = valor.strftime('%d/%m/%Y')
+                                else:
+                                    deadline = str(valor)
+                    
+                    st.caption(f"📅 {deadline}")
+                
+                with col4:
+                    # DEMANDA DE COMUNICAÇÃO
+                    demanda = "N/A"
+                    
+                    # Procurar por coluna de demanda de comunicação
+                    coluna_demanda_encontrada = None
+                    for col in df_exibicao.columns:
+                        if 'demanda' in str(col).lower() or 'comunicação' in str(col).lower() or 'comunicacao' in str(col).lower():
+                            coluna_demanda_encontrada = col
+                            break
+                    
+                    if coluna_demanda_encontrada:
+                        valor = row[coluna_demanda_encontrada]
+                        # Extrair o valor real
+                        if hasattr(valor, 'iloc') or hasattr(valor, 'values'):
+                            try:
+                                valor_real = valor.iloc[0] if hasattr(valor, 'iloc') else valor
+                                if valor_real is not None and str(valor_real).strip() != '' and str(valor_real).lower() != 'nan':
+                                    demanda = str(valor_real)
+                            except:
+                                demanda = str(valor)
+                        else:
+                            if valor is not None and str(valor).strip() != '' and str(valor).lower() != 'nan':
+                                demanda = str(valor)
+                    
+                    # Truncar se muito longo
+                    if len(demanda) > 20:
+                        demanda = demanda[:20] + "..."
+                    
+                    st.markdown(f"_{demanda}_")
+                
+                with col5:
+                    # Total de demandas
                     total = 0
                     
                     if 'Total Demandas' in df_exibicao.columns:
@@ -2760,12 +2824,11 @@ with tab4:
                     
                     st.markdown(f"**{total}**")
                 
-                # Expansor com detalhes - CORRIGIDO
+                # Expansor com detalhes
                 with st.expander(f"📌 Ver demandas desta campanha"):
                     # Filtrar demandas da campanha atual
                     if not df_camp_valid.empty:
-                        # Tentar diferentes maneiras de filtrar
-                        demandas = pd.DataFrame()  # vazio por padrão
+                        demandas = pd.DataFrame()
                         
                         if 'Campanha' in df_camp_valid.columns:
                             # Tentar correspondência exata
@@ -2798,9 +2861,9 @@ with tab4:
                                 else:
                                     st.metric("Taxa", "N/A")
                             
-                            # Tabela
+                            # Tabela com mais colunas
                             cols = []
-                            for col in ['ID', 'Status', 'Data de Solicitação', 'Tipo']:
+                            for col in ['ID', 'Status', 'Data de Solicitação', 'Deadline', 'Tipo']:
                                 if col in demandas.columns:
                                     cols.append(col)
                             
