@@ -2428,8 +2428,8 @@ with tab4:
     if filtros_ativos_tab4:
         st.info(f"🔍 **Filtros ativos:** {total_filtrado} de {len(df)} registros ({total_filtrado/len(df)*100:.1f}%)")
     
-    # =========================================================
-    # PREPARAR DADOS AGREGADOS POR CAMPANHA
+        # =========================================================
+    # PREPARAR DADOS AGREGADOS POR CAMPANHA (CORRIGIDO)
     # =========================================================
     with st.spinner("🔄 Agregando dados por campanha..."):
         # Filtrar apenas linhas com campanha válida
@@ -2476,45 +2476,65 @@ with tab4:
         # Executar agregação
         df_camp = df_agg.groupby(coluna_campanha).agg(agg_dict).reset_index()
         
-        # IMPORTANTE: Guardar o nome original da coluna de campanha
-        nome_coluna_campanha_original = coluna_campanha
+        # IMPORTANTE: O nome da coluna de campanha agora é uma tupla
+        # Vamos extrair o primeiro elemento da tupla como nome da coluna
         
         # Renomear colunas de forma segura
         novos_nomes = {}
+        colunas_para_remover = []
+        
         for col in df_camp.columns:
-            if col == nome_coluna_campanha_original:
-                novos_nomes[col] = 'Campanha'
-            elif col == 'is_concluida':
-                novos_nomes[col] = 'Total Concluídas'
-            elif col == 'ID' or (isinstance(col, str) and col == primeira_coluna):
-                novos_nomes[col] = 'Total Demandas'
-            elif isinstance(col, tuple):
-                if col[0] == 'Data de Solicitação' and col[1] == 'min':
+            # Se for uma tupla, o primeiro elemento é o nome original
+            if isinstance(col, tuple):
+                nome_original = col[0]
+                if nome_original == coluna_campanha or 'campanha' in str(nome_original).lower():
+                    novos_nomes[col] = 'Campanha'
+                elif col[0] == 'is_concluida':
+                    novos_nomes[col] = 'Total Concluídas'
+                elif col[0] == 'ID' or (isinstance(col[0], str) and col[0] == primeira_coluna):
+                    novos_nomes[col] = 'Total Demandas'
+                elif col[0] == 'Data de Solicitação' and col[1] == 'min':
                     novos_nomes[col] = 'Data Início'
                 elif col[0] == 'Data de Solicitação' and col[1] == 'max':
                     novos_nomes[col] = 'Data Fim'
-            elif col == 'Solicitante':
-                novos_nomes[col] = 'Solicitantes'
-            elif col == 'Tipo':
-                novos_nomes[col] = 'Tipos'
+                elif col[0] == 'Solicitante':
+                    novos_nomes[col] = 'Solicitantes'
+                elif col[0] == 'Tipo':
+                    novos_nomes[col] = 'Tipos'
+            else:
+                # Se não for tupla, é uma coluna simples
+                if col == coluna_campanha or 'campanha' in str(col).lower():
+                    novos_nomes[col] = 'Campanha'
+                elif col == 'is_concluida':
+                    novos_nomes[col] = 'Total Concluídas'
+                elif col == 'ID' or col == primeira_coluna:
+                    novos_nomes[col] = 'Total Demandas'
+                elif col == 'Solicitante':
+                    novos_nomes[col] = 'Solicitantes'
+                elif col == 'Tipo':
+                    novos_nomes[col] = 'Tipos'
         
         # Aplicar renomeação
         if novos_nomes:
             df_camp.rename(columns=novos_nomes, inplace=True)
         
-        # Verificar se a coluna 'Campanha' existe
+        # Verificar se a coluna 'Campanha' existe, se não, criar a partir dos dados
         if 'Campanha' not in df_camp.columns:
+            # Tentar encontrar qualquer coluna que contenha 'campanha' no nome
             for col in df_camp.columns:
-                if col == nome_coluna_campanha_original or 'campanha' in str(col).lower():
-                    df_camp.rename(columns={col: 'Campanha'}, inplace=True)
+                if 'campanha' in str(col).lower():
+                    df_camp['Campanha'] = df_camp[col]
                     break
             else:
-                df_camp['Campanha'] = f"Campanha {df_camp.index + 1}"
+                # Se não encontrar, usar o índice
+                st.warning("⚠️ Coluna de campanha não encontrada, usando índice como identificador")
+                df_camp['Campanha'] = [f"Campanha {i+1}" for i in range(len(df_camp))]
         
-        # Verificar se 'Total Demandas' existe
+        # Garantir que 'Total Demandas' existe
         if 'Total Demandas' not in df_camp.columns:
+            # Tentar encontrar uma coluna numérica para usar como total
             for col in df_camp.columns:
-                if col != 'Campanha' and col != 'Total Concluídas' and col not in ['Data Início', 'Data Fim', 'Solicitantes', 'Tipos']:
+                if col != 'Campanha' and col not in ['Data Início', 'Data Fim', 'Solicitantes', 'Tipos', 'Período']:
                     if pd.api.types.is_numeric_dtype(df_camp[col]):
                         df_camp['Total Demandas'] = df_camp[col]
                         break
@@ -2537,6 +2557,13 @@ with tab4:
         
         # Ordenar por total de demandas
         df_camp = df_camp.sort_values('Total Demandas', ascending=False).reset_index(drop=True)
+        
+        # DEBUG: Mostrar dados
+        if st.session_state.get('debug_mode', False):
+            with st.expander("🔍 Dados processados das campanhas"):
+                st.write("Colunas finais:", df_camp.columns.tolist())
+                st.write("Primeiras linhas:")
+                st.dataframe(df_camp[['Campanha', 'Total Demandas']].head())
     # =========================================================
     # DEBUG: Verificar dados da campanha
     # =========================================================
