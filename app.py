@@ -2164,12 +2164,12 @@ with tab3:
         if not df_exibicao.empty:
             col_res1, col_res2 = st.columns(2)
             with col_res1:
-                st.metric("Total de Campanhas", len(df_exibicao))
+                st.metric("Total de Demandas", len(df_exibicao)) #alterei aqui de Total campanhas para demandas
             with col_res2:
                 if 'Total Demandas' in df_exibicao.columns:
                     try:
                         total_demandas = int(df_exibicao['Total Demandas'].sum())
-                        st.metric("Total Demandas", total_demandas)
+                        st.metric("Total Entregas", total_demandas) #alterei aqui de Total Demandas para Entregas
                     except (ValueError, TypeError):
                         st.metric("Total Demandas", "N/A")
             
