@@ -2581,7 +2581,7 @@ with tab4:
         st.divider()
     
         # =========================================================
-    # LISTA DE CAMPANHAS - VERSÃO FINAL CORRIGIDA
+    # LISTA DE CAMPANHAS - VERSÃO SIMPLIFICADA (SEM PD.ISNA)
     # =========================================================
     st.markdown("### 📋 Lista de Campanhas")
     
@@ -2626,8 +2626,8 @@ with tab4:
                     nome_campanha = f"Campanha {idx+1}"  # valor padrão
                     if 'Campanha' in df_exibicao.columns:
                         valor_campanha = row['Campanha']
-                        # Verificar se não é nulo
-                        if valor_campanha is not None and str(valor_campanha).strip() != '' and not pd.isna(valor_campanha):
+                        # Verificar se não é nulo de forma simples
+                        if valor_campanha is not None and str(valor_campanha) != 'nan' and str(valor_campanha).strip() != '':
                             nome_campanha = str(valor_campanha)
                     st.markdown(f"**{nome_campanha}**")
                 
@@ -2635,7 +2635,8 @@ with tab4:
                     periodo = "Período não disponível"  # valor padrão
                     if 'Período' in df_exibicao.columns:
                         valor_periodo = row['Período']
-                        if valor_periodo is not None and str(valor_periodo).strip() != '' and not pd.isna(valor_periodo):
+                        # Verificar se não é nulo de forma simples
+                        if valor_periodo is not None and str(valor_periodo) != 'nan' and str(valor_periodo).strip() != '':
                             periodo = str(valor_periodo)
                     st.caption(periodo)
                 
@@ -2643,7 +2644,8 @@ with tab4:
                     total = 0  # valor padrão
                     if 'Total Demandas' in df_exibicao.columns:
                         valor_total = row['Total Demandas']
-                        if valor_total is not None and not pd.isna(valor_total):
+                        # Verificar se não é nulo de forma simples
+                        if valor_total is not None and str(valor_total) != 'nan':
                             try:
                                 total = int(float(valor_total))
                             except (ValueError, TypeError):
