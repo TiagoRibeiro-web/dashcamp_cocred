@@ -2614,11 +2614,15 @@ with tab4:
         )
     
     # =========================================================
-    # MÉTRICAS DA CAMPANHA SELECIONADA
+    # MÉTRICAS DA CAMPANHA SELECIONADA - CORRIGIDO
     # =========================================================
     if campanha_selecionada != 'Todas':
         # Filtrar a campanha selecionada
-        campanha_filtrada = df_camp[df_camp['Campanha'] == campanha_selecionada]
+        if 'Campanha' in df_camp.columns:
+            campanha_filtrada = df_camp[df_camp['Campanha'] == campanha_selecionada]
+        else:
+            # Se não tiver coluna Campanha, tentar encontrar por qualquer coluna
+            campanha_filtrada = df_camp[df_camp.iloc[:, 0] == campanha_selecionada]
         
         if not campanha_filtrada.empty:
             df_camp_sel = campanha_filtrada.iloc[0]
@@ -2627,15 +2631,26 @@ with tab4:
             col_m1, col_m2 = st.columns(2)
             
             with col_m1:
-                if 'Total Demandas' in df_camp_sel:
-                    st.metric("Total Demandas", int(df_camp_sel['Total Demandas']))
+                if 'Total Demandas' in df_camp_sel.index:
+                    valor_total = df_camp_sel['Total Demandas']
+                    # Garantir que é numérico
+                    try:
+                        total = int(float(valor_total))
+                        st.metric("Total Demandas", total)
+                    except (ValueError, TypeError):
+                        st.metric("Total Demandas", "N/A")
+            
             with col_m2:
-                if 'Período' in df_camp_sel:
-                    st.metric("Período", df_camp_sel['Período'])
+                if 'Período' in df_camp_sel.index:
+                    periodo = df_camp_sel['Período']
+                    # Período é texto, então não usar st.metric, usar markdown
+                    st.markdown(f"**Período:** {periodo}")
+                else:
+                    st.markdown("**Período:** Não disponível")
             
             st.divider()
     
-        # =========================================================
+    # =========================================================
     # LISTA DE CAMPANHAS - VERSÃO CORRIGIDA
     # =========================================================
     st.markdown("### 📋 Lista de Campanhas")
@@ -2644,12 +2659,15 @@ with tab4:
     if campanha_selecionada != 'Todas':
         if 'Campanha' in df_camp.columns:
             df_exibicao = df_camp[df_camp['Campanha'] == campanha_selecionada].copy()
-            if not df_exibicao.empty:
-                st.info(f"📌 Mostrando apenas: {campanha_selecionada}")
-            else:
-                st.warning(f"⚠️ Campanha '{campanha_selecionada}' não encontrada")
-                df_exibicao = df_camp.copy()
         else:
+            # Se não tiver coluna Campanha, tentar pela primeira coluna
+            primeira_coluna = df_camp.columns[0]
+            df_exibicao = df_camp[df_camp[primeira_coluna] == campanha_selecionada].copy()
+        
+        if not df_exibicao.empty:
+            st.info(f"📌 Mostrando apenas: {campanha_selecionada}")
+        else:
+            st.warning(f"⚠️ Campanha '{campanha_selecionada}' não encontrada")
             df_exibicao = df_camp.copy()
     else:
         df_exibicao = df_camp.copy()
@@ -2660,8 +2678,12 @@ with tab4:
                 st.metric("Total de Campanhas", len(df_exibicao))
             with col_res2:
                 if 'Total Demandas' in df_exibicao.columns:
-                    total_demandas = int(df_exibicao['Total Demandas'].sum())
-                    st.metric("Total Demandas", total_demandas)
+                    # Garantir que a soma seja numérica
+                    try:
+                        total_demandas = int(df_exibicao['Total Demandas'].sum())
+                        st.metric("Total Demandas", total_demandas)
+                    except (ValueError, TypeError):
+                        st.metric("Total Demandas", "N/A")
             
             st.divider()
     
@@ -2675,27 +2697,30 @@ with tab4:
                 col1, col2, col3 = st.columns([3, 2, 1])
                 
                 with col1:
-                    # Tentar obter o nome real da campanha
+                    # Nome da campanha
                     if 'Campanha' in df_exibicao.columns:
-                        valor_campanha = row['Campanha']
-                        # Verificar se é um valor válido
-                        if valor_campanha is not None and str(valor_campanha).strip() != '' and str(valor_campanha).lower() != 'nan':
-                            nome_campanha = str(valor_campanha)
+                        valor = row['Campanha']
+                        if valor is not None and str(valor).strip() != '' and str(valor).lower() != 'nan':
+                            nome_campanha = str(valor)
                         else:
-                            # Se for inválido, mostrar o índice mas com um indicador
-                            nome_campanha = f"**[SEM NOME] Campanha {idx+1}**"
-                            if st.session_state.get('debug_mode', False):
-                                st.caption(f"Valor bruto: {repr(valor_campanha)}")
+                            nome_campanha = f"Campanha {idx+1}"
                     else:
-                        nome_campanha = f"Campanha {idx+1}"
+                        # Usar a primeira coluna como nome da campanha
+                        primeira_coluna = df_exibicao.columns[0]
+                        valor = row[primeira_coluna]
+                        if valor is not None and str(valor).strip() != '' and str(valor).lower() != 'nan':
+                            nome_campanha = str(valor)
+                        else:
+                            nome_campanha = f"Campanha {idx+1}"
                     
                     st.markdown(f"**{nome_campanha}**")
                 
                 with col2:
+                    # Período
                     if 'Período' in df_exibicao.columns:
-                        valor_periodo = row['Período']
-                        if valor_periodo is not None and str(valor_periodo).strip() != '' and str(valor_periodo).lower() != 'nan':
-                            periodo = str(valor_periodo)
+                        valor = row['Período']
+                        if valor is not None and str(valor).strip() != '' and str(valor).lower() != 'nan':
+                            periodo = str(valor)
                         else:
                             periodo = "Período não disponível"
                     else:
@@ -2703,12 +2728,13 @@ with tab4:
                     st.caption(periodo)
                 
                 with col3:
+                    # Total de demandas
                     if 'Total Demandas' in df_exibicao.columns:
-                        valor_total = row['Total Demandas']
-                        if valor_total is not None and str(valor_total).lower() != 'nan':
+                        valor = row['Total Demandas']
+                        if valor is not None and str(valor).lower() != 'nan':
                             try:
-                                total = int(float(valor_total))
-                            except:
+                                total = int(float(valor))
+                            except (ValueError, TypeError):
                                 total = 0
                         else:
                             total = 0
@@ -2718,15 +2744,14 @@ with tab4:
                 
                 # Expansor com detalhes
                 with st.expander(f"📌 Ver demandas desta campanha"):
-                    # Usar o nome real da campanha para filtrar
-                    nome_real = nome_campanha.replace("**[SEM NOME] ", "").replace("**", "") if "SEM NOME" in nome_campanha else nome_campanha
-                    
+                    # Filtrar demandas da campanha atual
                     if 'Campanha' in df_camp_valid.columns:
-                        demandas = df_camp_valid[df_camp_valid['Campanha'] == nome_real]
+                        demandas = df_camp_valid[df_camp_valid['Campanha'] == nome_campanha]
                     else:
-                        demandas = df_camp_valid[df_camp_valid[coluna_campanha] == nome_real]
+                        demandas = df_camp_valid[df_camp_valid[coluna_campanha] == nome_campanha]
                     
                     if not demandas.empty:
+                        # Métricas
                         c1, c2, c3 = st.columns(3)
                         with c1:
                             st.metric("Total", len(demandas))
@@ -2743,13 +2768,14 @@ with tab4:
                             else:
                                 st.metric("Taxa", "N/A")
                         
-                        cols_tabela = []
+                        # Tabela
+                        cols = []
                         for col in ['ID', 'Status', 'Data de Solicitação', 'Tipo']:
                             if col in demandas.columns:
-                                cols_tabela.append(col)
+                                cols.append(col)
                         
-                        if cols_tabela:
-                            st.dataframe(demandas[cols_tabela], use_container_width=True, hide_index=True)
+                        if cols:
+                            st.dataframe(demandas[cols], use_container_width=True, hide_index=True)
                     else:
                         st.info("ℹ️ Nenhuma demanda encontrada para esta campanha")
                 
