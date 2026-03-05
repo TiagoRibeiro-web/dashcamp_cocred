@@ -2537,21 +2537,42 @@ with tab4:
         
         # Ordenar por total de demandas
         df_camp = df_camp.sort_values('Total Demandas', ascending=False).reset_index(drop=True)
-    
     # =========================================================
-    # SELETOR DE CAMPANHA - CORRIGIDO
+    # DEBUG: Verificar dados da campanha
+    # =========================================================
+        if st.session_state.get('debug_mode', False):
+            with st.expander("🔍 Dados brutos das campanhas (DEBUG)"):
+                st.write("Colunas disponíveis:", df_camp.columns.tolist())
+                st.write("Primeiras 5 linhas:")
+                st.dataframe(df_camp[['Campanha', 'Total Demandas']].head() if 'Campanha' in df_camp.columns else df_camp.head())
+                st.write("Valores únicos na coluna Campanha:", df_camp['Campanha'].unique()[:10] if 'Campanha' in df_camp.columns else "Coluna não encontrada")
+    # =========================================================
+    # SELETOR DE CAMPANHA - CORRIGIDO COM DEBUG
     # =========================================================
     st.markdown("### 🎯 Selecionar Demanda")
     
     col_sel1, col_sel2 = st.columns([3, 1])
     
     with col_sel1:
+        # Primeiro, vamos verificar se temos a coluna Campanha
         if 'Campanha' in df_camp.columns:
-            # Garantir que não temos valores nulos na lista
+            # Mostrar os valores únicos para debug
+            if st.session_state.get('debug_mode', False):
+                st.write("Valores únicos em 'Campanha':", df_camp['Campanha'].unique())
+            
+            # Filtrar valores nulos e vazios
             campanhas_validas = df_camp['Campanha'].dropna().tolist()
-            campanhas_validas = [str(c) for c in campanhas_validas if str(c).strip() != '']
-            campanhas_lista = ['Todas'] + campanhas_validas
+            campanhas_validas = [str(c) for c in campanhas_validas if str(c).strip() != '' and str(c).lower() != 'nan']
+            
+            # Se não houver campanhas válidas, mostrar mensagem
+            if not campanhas_validas:
+                st.warning("⚠️ Nenhuma campanha válida encontrada na coluna 'Campanha'")
+                campanhas_lista = ['Todas']
+            else:
+                campanhas_lista = ['Todas'] + campanhas_validas
         else:
+            # Se não encontrar a coluna Campanha, mostrar as colunas disponíveis
+            st.warning(f"⚠️ Coluna 'Campanha' não encontrada. Colunas disponíveis: {df_camp.columns.tolist()}")
             campanhas_lista = ['Todas'] + [f"Campanha {i+1}" for i in range(len(df_camp))]
         
         # Inicializar session state se não existir
@@ -2564,12 +2585,6 @@ with tab4:
             index=0,
             key="seletor_campanha"
         )
-    
-    with col_sel2:
-        st.markdown("<br>", unsafe_allow_html=True)
-        if st.button("🔄 Limpar seleção", use_container_width=True):
-            st.session_state.seletor_campanha = 'Todas'
-            st.rerun()
     
     # =========================================================
     # MÉTRICAS DA CAMPANHA SELECIONADA
@@ -2593,18 +2608,21 @@ with tab4:
             
             st.divider()
     
-    # =========================================================
-    # LISTA DE CAMPANHAS - VERSÃO ÚNICA (CORRIGIDA)
+        # =========================================================
+    # LISTA DE CAMPANHAS - VERSÃO CORRIGIDA
     # =========================================================
     st.markdown("### 📋 Lista de Campanhas")
     
     # Determinar qual dataframe usar baseado na seleção
     if campanha_selecionada != 'Todas':
-        df_exibicao = df_camp[df_camp['Campanha'] == campanha_selecionada].copy()
-        if not df_exibicao.empty:
-            st.info(f"📌 Mostrando apenas: {campanha_selecionada}")
+        if 'Campanha' in df_camp.columns:
+            df_exibicao = df_camp[df_camp['Campanha'] == campanha_selecionada].copy()
+            if not df_exibicao.empty:
+                st.info(f"📌 Mostrando apenas: {campanha_selecionada}")
+            else:
+                st.warning(f"⚠️ Campanha '{campanha_selecionada}' não encontrada")
+                df_exibicao = df_camp.copy()
         else:
-            st.warning(f"⚠️ Campanha '{campanha_selecionada}' não encontrada")
             df_exibicao = df_camp.copy()
     else:
         df_exibicao = df_camp.copy()
@@ -2624,52 +2642,64 @@ with tab4:
     if df_exibicao.empty:
         st.warning("⚠️ Nenhuma campanha encontrada com os filtros atuais")
     else:
-        # TABELA INTERATIVA - ÚNICA (APENAS 3 COLUNAS)
+        # TABELA INTERATIVA
         for idx, row in df_exibicao.iterrows():
             with st.container():
-                # Mostrar apenas 3 colunas: Campanha, Período e Total Demandas
                 col1, col2, col3 = st.columns([3, 2, 1])
                 
                 with col1:
-                    # Nome da campanha
-                    nome_campanha = f"Campanha {idx+1}"
+                    # Tentar obter o nome real da campanha
                     if 'Campanha' in df_exibicao.columns:
-                        valor = row['Campanha']
-                        if valor is not None and str(valor) != 'nan' and str(valor).strip() != '':
-                            nome_campanha = str(valor)
+                        valor_campanha = row['Campanha']
+                        # Verificar se é um valor válido
+                        if valor_campanha is not None and str(valor_campanha).strip() != '' and str(valor_campanha).lower() != 'nan':
+                            nome_campanha = str(valor_campanha)
+                        else:
+                            # Se for inválido, mostrar o índice mas com um indicador
+                            nome_campanha = f"**[SEM NOME] Campanha {idx+1}**"
+                            if st.session_state.get('debug_mode', False):
+                                st.caption(f"Valor bruto: {repr(valor_campanha)}")
+                    else:
+                        nome_campanha = f"Campanha {idx+1}"
+                    
                     st.markdown(f"**{nome_campanha}**")
                 
                 with col2:
-                    # Período
-                    periodo = "Período não disponível"
                     if 'Período' in df_exibicao.columns:
-                        valor = row['Período']
-                        if valor is not None and str(valor) != 'nan' and str(valor).strip() != '':
-                            periodo = str(valor)
+                        valor_periodo = row['Período']
+                        if valor_periodo is not None and str(valor_periodo).strip() != '' and str(valor_periodo).lower() != 'nan':
+                            periodo = str(valor_periodo)
+                        else:
+                            periodo = "Período não disponível"
+                    else:
+                        periodo = "Período não disponível"
                     st.caption(periodo)
                 
                 with col3:
-                    # Total de demandas
-                    total = 0
                     if 'Total Demandas' in df_exibicao.columns:
-                        valor = row['Total Demandas']
-                        if valor is not None and str(valor) != 'nan':
+                        valor_total = row['Total Demandas']
+                        if valor_total is not None and str(valor_total).lower() != 'nan':
                             try:
-                                total = int(float(valor))
+                                total = int(float(valor_total))
                             except:
                                 total = 0
+                        else:
+                            total = 0
+                    else:
+                        total = 0
                     st.markdown(f"**{total}**")
                 
                 # Expansor com detalhes
                 with st.expander(f"📌 Ver demandas desta campanha"):
-                    # Filtrar demandas da campanha atual
+                    # Usar o nome real da campanha para filtrar
+                    nome_real = nome_campanha.replace("**[SEM NOME] ", "").replace("**", "") if "SEM NOME" in nome_campanha else nome_campanha
+                    
                     if 'Campanha' in df_camp_valid.columns:
-                        demandas = df_camp_valid[df_camp_valid['Campanha'] == nome_campanha]
+                        demandas = df_camp_valid[df_camp_valid['Campanha'] == nome_real]
                     else:
-                        demandas = df_camp_valid[df_camp_valid[coluna_campanha] == nome_campanha]
+                        demandas = df_camp_valid[df_camp_valid[coluna_campanha] == nome_real]
                     
                     if not demandas.empty:
-                        # Métricas
                         c1, c2, c3 = st.columns(3)
                         with c1:
                             st.metric("Total", len(demandas))
@@ -2686,14 +2716,13 @@ with tab4:
                             else:
                                 st.metric("Taxa", "N/A")
                         
-                        # Tabela
-                        cols = []
+                        cols_tabela = []
                         for col in ['ID', 'Status', 'Data de Solicitação', 'Tipo']:
                             if col in demandas.columns:
-                                cols.append(col)
+                                cols_tabela.append(col)
                         
-                        if cols:
-                            st.dataframe(demandas[cols], use_container_width=True, hide_index=True)
+                        if cols_tabela:
+                            st.dataframe(demandas[cols_tabela], use_container_width=True, hide_index=True)
                     else:
                         st.info("ℹ️ Nenhuma demanda encontrada para esta campanha")
                 
