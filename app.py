@@ -2697,7 +2697,7 @@ with tab4:
             st.divider()
     
         # =========================================================
-    # LISTA DE CAMPANHAS - COM COLUNAS DE DEADLINE E DEMANDA
+    # LISTA DE CAMPANHAS - VERSÃO SIMPLIFICADA (SEM PERÍODO E DEMANDA)
     # =========================================================
     st.markdown("### 📋 Lista de Campanhas")
     
@@ -2736,11 +2736,11 @@ with tab4:
     if df_exibicao.empty:
         st.warning("⚠️ Nenhuma campanha encontrada com os filtros atuais")
     else:
-        # TABELA INTERATIVA - COM 5 COLUNAS (Campanha, Período, Deadline, Demanda, Total)
+        # TABELA INTERATIVA - APENAS 3 COLUNAS (Campanha, Deadline, Total)
         for idx, row in df_exibicao.iterrows():
             with st.container():
-                # Criar 5 colunas: Campanha, Período, Deadline, Demanda de Comunicação, Total
-                col1, col2, col3, col4, col5 = st.columns([3, 2, 2, 2, 1])
+                # Criar 3 colunas: Campanha, Deadline, Total
+                col1, col2, col3 = st.columns([4, 2, 1])
                 
                 with col1:
                     # Nome da campanha
@@ -2763,26 +2763,6 @@ with tab4:
                     st.markdown(f"**{nome_campanha}**")
                 
                 with col2:
-                    # Período
-                    periodo = "N/A"
-                    
-                    if 'Período' in df_exibicao.columns:
-                        valor = row['Período']
-                        # Extrair o valor real
-                        if hasattr(valor, 'iloc') or hasattr(valor, 'values'):
-                            try:
-                                valor_real = valor.iloc[0] if hasattr(valor, 'iloc') else valor
-                                if valor_real is not None and str(valor_real).strip() != '' and str(valor_real).lower() != 'nan':
-                                    periodo = str(valor_real)
-                            except:
-                                periodo = str(valor)
-                        else:
-                            if valor is not None and str(valor).strip() != '' and str(valor).lower() != 'nan':
-                                periodo = str(valor)
-                    
-                    st.caption(periodo)
-                
-                with col3:
                     # DEADLINE
                     deadline = "N/A"
                     
@@ -2816,38 +2796,7 @@ with tab4:
                     
                     st.caption(f"📅 {deadline}")
                 
-                with col4:
-                    # DEMANDA DE COMUNICAÇÃO
-                    demanda = "N/A"
-                    
-                    # Procurar por coluna de demanda de comunicação
-                    coluna_demanda_encontrada = None
-                    for col in df_exibicao.columns:
-                        if 'demanda' in str(col).lower() or 'comunicação' in str(col).lower() or 'comunicacao' in str(col).lower():
-                            coluna_demanda_encontrada = col
-                            break
-                    
-                    if coluna_demanda_encontrada:
-                        valor = row[coluna_demanda_encontrada]
-                        # Extrair o valor real
-                        if hasattr(valor, 'iloc') or hasattr(valor, 'values'):
-                            try:
-                                valor_real = valor.iloc[0] if hasattr(valor, 'iloc') else valor
-                                if valor_real is not None and str(valor_real).strip() != '' and str(valor_real).lower() != 'nan':
-                                    demanda = str(valor_real)
-                            except:
-                                demanda = str(valor)
-                        else:
-                            if valor is not None and str(valor).strip() != '' and str(valor).lower() != 'nan':
-                                demanda = str(valor)
-                    
-                    # Truncar se muito longo
-                    if len(demanda) > 20:
-                        demanda = demanda[:20] + "..."
-                    
-                    st.markdown(f"_{demanda}_")
-                
-                with col5:
+                with col3:
                     # Total de demandas
                     total = 0
                     
@@ -2870,7 +2819,7 @@ with tab4:
                     
                     st.markdown(f"**{total}**")
                 
-                                # Expansor com detalhes - CORRIGIDO (com Deadline e Demanda de Comunicação)
+                # Expansor com detalhes (aqui dentro continua tendo todas as informações)
                 with st.expander(f"📌 Ver demandas desta campanha"):
                     # Filtrar demandas da campanha atual
                     if not df_camp_valid.empty:
@@ -2907,7 +2856,7 @@ with tab4:
                                 else:
                                     st.metric("Taxa", "N/A")
                             
-                            # TABELA DE DEMANDAS COM MAIS COLUNAS
+                            # TABELA DE DEMANDAS
                             st.markdown("##### 📋 Detalhamento das Demandas")
                             
                             # Lista de colunas para exibir na tabela
@@ -2918,48 +2867,28 @@ with tab4:
                                 if col in demandas.columns:
                                     cols_tabela.append(col)
                             
-                            # Coluna de Data de Solicitação
+                            # Data de Solicitação
                             if 'Data de Solicitação' in demandas.columns:
                                 cols_tabela.append('Data de Solicitação')
                             
-                            # Coluna de DEADLINE (agora incluída)
+                            # Deadline
                             if 'Deadline' in demandas.columns:
                                 cols_tabela.append('Deadline')
                             else:
-                                # Procurar por colunas similares a deadline
                                 for col in demandas.columns:
                                     if 'deadline' in col.lower() or 'prazo' in col.lower():
                                         cols_tabela.append(col)
                                         break
-                            
-                            # Coluna de DEMANDA DE COMUNICAÇÃO (agora incluída)
-                            coluna_demanda_encontrada = None
-                            for col in demandas.columns:
-                                if 'demanda' in col.lower() or 'comunicação' in col.lower() or 'comunicacao' in col.lower():
-                                    coluna_demanda_encontrada = col
-                                    break
-                            
-                            if coluna_demanda_encontrada:
-                                cols_tabela.append(coluna_demanda_encontrada)
                             
                             # Outras colunas relevantes
                             for col in ['Tipo', 'Tipo Atividade', 'Peça', 'Solicitante', 'Produção']:
                                 if col in demandas.columns and col not in cols_tabela:
                                     cols_tabela.append(col)
                             
-                            # Se não encontrou nenhuma coluna de demanda, adicionar a coluna original
-                            if 'Demanda de Comunicação' not in cols_tabela and coluna_demanda_encontrada is None:
-                                # Tentar encontrar qualquer coluna que possa ser a demanda
-                                for col in demandas.columns:
-                                    if col not in cols_tabela and col not in ['ID', 'Status', 'Prioridade', 'Data de Solicitação', 'Deadline']:
-                                        if demandas[col].dtype == 'object':  # Colunas de texto
-                                            cols_tabela.append(col)
-                                            break
-                            
                             # Criar uma cópia para formatação
                             df_display = demandas[cols_tabela].copy() if cols_tabela else demandas.copy()
                             
-                            # Formatar datas se necessário
+                            # Formatar datas
                             for col in df_display.columns:
                                 if 'data' in col.lower() or 'deadline' in col.lower() or 'prazo' in col.lower():
                                     if pd.api.types.is_datetime64_any_dtype(df_display[col]):
@@ -2973,12 +2902,13 @@ with tab4:
                                 height=min(400, len(df_display) * 35 + 50)
                             )
                             
-                            # Mostrar contagem
                             st.caption(f"Total de demandas listadas: {len(df_display)}")
                         else:
                             st.info("ℹ️ Nenhuma demanda encontrada para esta campanha")
                     else:
                         st.info("ℹ️ Dados de demanda não disponíveis")
+                
+                st.divider()
 
 # =========================================================
 # EXPORTAÇÃO (FORA DAS TABS)
