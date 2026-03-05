@@ -336,7 +336,7 @@ with st.sidebar:
     st.markdown("""
     <div style="text-align: center; margin-bottom: 20px;">
         <h1 style="color: #003366; font-size: 28px; margin: 0;">📊 COCRED</h1>
-        <p style="color: #00A3E0; font-size: 12px; margin: 0;">Dashboard de Campanhas</p>
+        <p style="color: #00A3E0; font-size: 12px; margin: 0;">Dashboard de Demandas</p>
     </div>
     """, unsafe_allow_html=True)
     
@@ -447,7 +447,7 @@ with st.sidebar:
 # =========================================================
 st.markdown(f"""
 <div style="display: flex; align-items: center; margin-bottom: 20px;">
-    <h1 style="color: #003366; margin: 0;">📊 Dashboard de Campanhas</h1>
+    <h1 style="color: #003366; margin: 0;">📊 Dashboard de Demandas</h1>
     <span style="background: #00A3E0; color: white; padding: 5px 15px; border-radius: 20px; margin-left: 20px; font-size: 14px;">
         SICOOB COCRED
     </span>
